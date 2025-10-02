@@ -449,86 +449,80 @@
         // LÓGICA DE REGISTRO
         // -----------------------------------------------------------
 
-        async function registrarJornada(type) {
-            statusMessageDiv.style.display = "none";
-            const docente = docenteInput.value.trim();
-            if (!docente) {
-                showStatusMessage("Por favor, ingresa tu nombre.", "error");
-                return;
-            }
-            
-            // Paso 1: Intentar Auto-Finalizar sesiones abiertas
-            const autoEndMessage = await checkAndAutoEndSessions(docente);
-            if (autoEndMessage) {
-                showStatusMessage(autoEndMessage, "info");
-                if (type === 'fin') return; 
-            }
+async function registrarJornada(type) {
+    statusMessageDiv.style.display = "none";
+    const docente = docenteInput.value.trim();
+    if (!docente) {
+        showStatusMessage("Por favor, ingresa tu nombre.", "error");
+        return;
+    }
 
-            const hoy = new Date();
-            const fecha = hoy.toLocaleDateString("es-ES");
-            const diaSemana = hoy.toLocaleDateString("es-ES", { weekday: "long" }).toLowerCase();
-            const hora = hoy.toLocaleTimeString(); 
-            let claseInfo = findCurrentClass(docente, diaSemana) || "N/A";
-            
-            if (specialRoles[docente]) { 
-                claseInfo = specialRoles[docente];
-            } else if (type === 'inicio') {
-                // Paso 2: VALIDACIÓN DE RETRASO
-                const delayedClass = findClassForDelayValidation(docente, diaSemana);
-                
-                if (delayedClass) {
-                    const timePart = delayedClass.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
-                    const [, startHour, startMinute] = timePart.map(Number);
-                    const startTime = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`;
-                    
-                    showStatusMessage(`❌ No puedes registrar el inicio de jornada. La clase **${delayedClass.split('(')[0].trim()}** comenzó a las **${startTime}** y el tiempo límite de ${MAX_DELAY_MINUTES} minutos ha expirado.`, "error");
-                    return;
-                }
-                
-                // Si no hay clase actual, la clase para el registro debe ser la próxima clase
-                if (claseInfo === "N/A") {
-                    claseInfo = findNextClass(docente, diaSemana) || "N/A";
-                }
-            }
+    const autoEndMessage = await checkAndAutoEndSessions(docente);
+    if (autoEndMessage) {
+        showStatusMessage(autoEndMessage, "info");
+        if (type === 'fin') return; 
+    }
 
+    const hoy = new Date();
+    const fecha = hoy.toLocaleDateString("es-ES");
+    const diaSemana = hoy.toLocaleDateString("es-ES", { weekday: "long" }).toLowerCase();
+    const hora = hoy.toLocaleTimeString(); 
+    let claseInfo = findCurrentClass(docente, diaSemana) || "N/A";
 
-            if (!navigator.geolocation) {
-                showStatusMessage("Tu navegador no soporta geolocalización.", "error");
-                return;
-            }
+    if (specialRoles[docente]) { 
+        claseInfo = specialRoles[docente];
+    } else if (type === 'inicio') {
+        const delayedClass = findClassForDelayValidation(docente, diaSemana);
+        if (delayedClass) {
+            const timePart = delayedClass.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
+            const [, startHour, startMinute] = timePart.map(Number);
+            const startTime = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`;
+            showStatusMessage(`❌ No puedes registrar el inicio de jornada. La clase **${delayedClass.split('(')[0].trim()}** comenzó a las **${startTime}** y el tiempo límite de ${MAX_DELAY_MINUTES} minutos ha expirado.`, "error");
+            return;
+        }
+        if (claseInfo === "N/A") {
+            claseInfo = findNextClass(docente, diaSemana) || "N/A";
+        }
+    }
 
-            try {
-                const position = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 });
-                });
-                const { latitude: lat, longitude: lon } = position.coords;
-                const distance = calculateDistance(SCHOOL_LAT, SCHOOL_LON, lat, lon);
-                const inZone = distance <= MAX_DISTANCE_KM;
+    // --- NUEVA VERIFICACIÓN ---
+    // Primero, revisamos si el navegador soporta geolocalización en absoluto.
+    if (!navigator.geolocation) {
+        showStatusMessage("🚫 Tu navegador no soporta o ha bloqueado la geolocalización.", "error");
+        console.error("Diagnóstico: navigator.geolocation no está disponible.");
+        return; // Detenemos la función aquí
+    }
 
-                if (!inZone) {
-                    showStatusMessage(`❌ ¡Atención! Estás fuera del área permitida (${distance.toFixed(2)} km de la escuela).`, "error");
-                } else {
-                    const record = { 
-                        docente, 
-                        type, 
-                        fecha, 
-                        diaSemana, 
-                        hora, 
-                        lat, 
-                        lon, 
-                        inZone, 
-                        clase: claseInfo,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    await saveRecord(record);
-                    showStatusMessage(`✅ Registro de ${type === 'inicio' ? 'INICIO' : 'FIN'} de jornada exitoso para ${docente}.`, "success");
-                }
-            } catch (error) {
-                let msg = "🚫 No se pudo obtener la ubicación.";
-                if (error.code === 1) msg = "🚨 Permiso de ubicación denegado. Habilita la ubicación en tu navegador.";
-                else if (error.code === 2) msg = "⚠️ La información de ubicación no está disponible.";
-                else if (error.code === 3) msg = "⌛ Tiempo de espera agotado al obtener la ubicación.";
-                showStatusMessage(msg, "error");
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 });
+        });
+        const { latitude: lat, longitude: lon } = position.coords;
+        const distance = calculateDistance(SCHOOL_LAT, SCHOOL_LON, lat, lon);
+        const inZone = distance <= MAX_DISTANCE_KM;
+
+        if (!inZone) {
+            showStatusMessage(`❌ ¡Atención! Estás fuera del área permitida (${distance.toFixed(2)} km de la escuela).`, "error");
+        } else {
+            const record = { 
+                docente, type, fecha, diaSemana, hora, lat, lon, inZone, 
+                clase: claseInfo,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            await saveRecord(record);
+            showStatusMessage(`✅ Registro de ${type === 'inicio' ? 'INICIO' : 'FIN'} de jornada exitoso para ${docente}.`, "success");
+        }
+    } catch (error) {
+        let msg = "🚫 No se pudo obtener la ubicación.";
+        if (error.code === 1) msg = "🚨 Permiso de ubicación denegado. Habilita la ubicación en tu navegador.";
+        else if (error.code === 2) msg = "⚠️ La información de ubicación no está disponible.";
+        else if (error.code === 3) msg = "⌛ Tiempo de espera agotado al obtener la ubicación.";
+
+        // --- REGISTRO DEL ERROR EN CONSOLA ---
+        // Imprimimos el error real en la consola para saber qué es.
+        console.error("Ocurrió un error de geolocalización:", error);
+
+        showStatusMessage(msg, "error");
             }
         }
 
@@ -767,3 +761,4 @@
 </body>
 
 </html>
+
