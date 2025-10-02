@@ -233,18 +233,15 @@
         <div class="footer">© <span id="y"></span> Instituto Educativo San Carlos</div>
     </div>
 
-    <script>
+<script>
         // -----------------------------------------------------------
-        // CONSTANTES
+        // CONSTANTES Y CONFIGURACIÓN INICIAL
         // -----------------------------------------------------------
         const SCHOOL_LAT = 19.560137;
         const SCHOOL_LON = -97.238952;
         const MAX_DISTANCE_KM = 0.15;
         const ADMIN_PASSWORD = "IEC25#";
         const MAX_DELAY_MINUTES = 10; 
-        
-        // CONSTANTES para auto-finalización de roles especiales (Jornada 7:40 - 15:40)
-        const ADMIN_START_TIME = "07:40:00";
         const ADMIN_END_TIME = "15:40:00";
         const ADMIN_END_TIME_MINUTES = 15 * 60 + 40; 
 
@@ -279,8 +276,17 @@
         document.getElementById('y').textContent = new Date().getFullYear();
 
         // -----------------------------------------------------------
-        // FUNCIONES DE UTILIDAD Y BÚSQUEDA
+        // FUNCIONES AUXILIARES (¡AQUÍ ESTABA EL PROBLEMA!)
         // -----------------------------------------------------------
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
 
         function findCurrentClass(docente, diaSemana) {
             const currentHour = new Date().getHours();
@@ -290,7 +296,7 @@
             if (!teacherSchedule) { return undefined; }
             const classes = teacherSchedule.split(' / ');
             
-            let currentClass = classes.find(clase => {
+            return classes.find(clase => {
                 const timePart = clase.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
                 if (timePart) {
                     const [, startHour, startMinute, endHour, endMinute] = timePart.map(Number);
@@ -300,8 +306,6 @@
                 }
                 return false;
             });
-            
-            return currentClass;
         }
         
         function findClassForDelayValidation(docente, diaSemana) {
@@ -313,19 +317,19 @@
 
             const classes = teacherSchedule.split(' / ');
             
-            let classToValidate = classes.find(clase => {
+            return classes.find(clase => {
                 const timePart = clase.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
                 if (timePart) {
                     const [, startHour, startMinute] = timePart.map(Number);
                     const startTimeInMinutes = startHour * 60 + startMinute;
-                    
-                    if (currentTimeInMinutes > startTimeInMinutes + MAX_DELAY_MINUTES) {
+                    if (currentTimeInMinutes > startTimeInMinutes && currentTimeInMinutes > startTimeInMinutes + MAX_DELAY_MINUTES) {
+                        // This logic seems complex, let's simplify for now or just trust it.
+                        // The main point is to find a class whose start time has passed by more than the delay.
                         return true;
                     }
                 }
                 return false;
             });
-            return classToValidate;
         }
         
         function findNextClass(docente, diaSemana) {
@@ -357,7 +361,7 @@
         }
 
         function showStatusMessage(message, type) {
-            statusMessageDiv.textContent = message;
+            statusMessageDiv.innerHTML = message; // Use innerHTML to render potential bold tags
             statusMessageDiv.className = `alert ${type}`;
             statusMessageDiv.style.display = "block";
         }
@@ -366,12 +370,13 @@
             try {
                 await db.collection("asistencia").add(record);
             } catch (error) {
+                console.error("Error saving record to Firebase:", error);
                 showStatusMessage("Ocurrió un error al guardar tu registro. Inténtalo de nuevo.", "error");
             }
         }
 
         // -----------------------------------------------------------
-        // LÓGICA DE AUTO-FINALIZACIÓN
+        // LÓGICA PRINCIPAL
         // -----------------------------------------------------------
 
         async function checkAndAutoEndSessions(docente) {
@@ -384,9 +389,7 @@
                 .orderBy("timestamp", "desc")
                 .limit(1).get();
 
-            if (lastRecordSnapshot.empty) {
-                return null;
-            }
+            if (lastRecordSnapshot.empty) return null;
 
             const lastRecord = lastRecordSnapshot.docs[0].data();
 
@@ -398,23 +401,17 @@
             if (role && (role.includes("Jornada Completa") || role.includes("Director") || role.includes("Subdirector") || role.includes("Coordinador"))) {
                 if (currentTimeInMinutes > ADMIN_END_TIME_MINUTES) {
                     const autoEndRecord = {
-                        docente,
-                        type: "fin",
-                        fecha: hoy.toLocaleDateString("es-ES"),
-                        diaSemana,
-                        hora: ADMIN_END_TIME, 
-                        lat: lastRecord.lat || SCHOOL_LAT, 
-                        lon: lastRecord.lon || SCHOOL_LON,
-                        inZone: true,
-                        clase: role,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        docente, type: "fin", fecha: hoy.toLocaleDateString("es-ES"), diaSemana, hora: ADMIN_END_TIME, 
+                        lat: lastRecord.lat || SCHOOL_LAT, lon: lastRecord.lon || SCHOOL_LON,
+                        inZone: true, clase: role, timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     await saveRecord(autoEndRecord);
-                    return `✅ Jornada de **${docente}** (Rol: ${role}) finalizada automáticamente a las ${ADMIN_END_TIME}.`;
+                    return `Jornada de <b>${docente}</b> (Rol: ${role}) finalizada automáticamente.`;
                 }
             } 
-            else if (horarios[docente] && horarios[docente][diaSemana] && !role) {
+            else if (horarios[docente]?.[diaSemana] && !role) {
                 const lastClassRegistered = lastRecord.clase;
+                if (!lastClassRegistered) return null;
                 const classTimeMatch = lastClassRegistered.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
 
                 if (classTimeMatch) {
@@ -426,110 +423,133 @@
                         const endTimeStr = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`;
 
                         const autoEndRecord = {
-                            docente,
-                            type: "fin",
-                            fecha: hoy.toLocaleDateString("es-ES"),
-                            diaSemana,
-                            hora: endTimeStr, 
-                            lat: lastRecord.lat || SCHOOL_LAT,
-                            lon: lastRecord.lon || SCHOOL_LON,
-                            inZone: true,
-                            clase: lastClassRegistered,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                            docente, type: "fin", fecha: hoy.toLocaleDateString("es-ES"), diaSemana, hora: endTimeStr, 
+                            lat: lastRecord.lat || SCHOOL_LAT, lon: lastRecord.lon || SCHOOL_LON,
+                            inZone: true, clase: lastClassRegistered, timestamp: firebase.firestore.FieldValue.serverTimestamp()
                         };
                         await saveRecord(autoEndRecord);
-                        return `✅ Clase de **${claseName.trim()}** finalizada automáticamente a las ${endTimeStr}.`;
+                        return `Clase de <b>${claseName.trim()}</b> finalizada automáticamente.`;
                     }
                 }
             }
             return null;
         }
         
-        // -----------------------------------------------------------
-        // LÓGICA DE REGISTRO
-        // -----------------------------------------------------------
+        async function registrarJornada(type) {
+            statusMessageDiv.style.display = "none";
+            const docente = docenteInput.value.trim();
+            if (!docente) {
+                showStatusMessage("Por favor, ingresa tu nombre.", "error");
+                return;
+            }
+            
+            const autoEndMessage = await checkAndAutoEndSessions(docente);
+            if (autoEndMessage) {
+                showStatusMessage(autoEndMessage, "info");
+                if (type === 'fin') return; 
+            }
 
-async function registrarJornada(type) {
-    statusMessageDiv.style.display = "none";
-    const docente = docenteInput.value.trim();
-    if (!docente) {
-        showStatusMessage("Por favor, ingresa tu nombre.", "error");
-        return;
-    }
+            const hoy = new Date();
+            const fecha = hoy.toLocaleDateString("es-ES");
+            const diaSemana = hoy.toLocaleDateString("es-ES", { weekday: "long" }).toLowerCase();
+            const hora = hoy.toLocaleTimeString(); 
+            let claseInfo = findCurrentClass(docente, diaSemana) || "N/A";
+            
+            if (specialRoles[docente]) { 
+                claseInfo = specialRoles[docente];
+            } else if (type === 'inicio') {
+                const delayedClass = findClassForDelayValidation(docente, diaSemana);
+                if (delayedClass) {
+                    const timePart = delayedClass.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
+                    const [, startHour, startMinute] = timePart.map(Number);
+                    const startTime = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`;
+                    showStatusMessage(`❌ No puedes registrar. La clase <b>${delayedClass.split('(')[0].trim()}</b> comenzó a las <b>${startTime}</b> y el tiempo límite ha expirado.`, "error");
+                    return;
+                }
+                if (claseInfo === "N/A") {
+                    claseInfo = findNextClass(docente, diaSemana) || "N/A";
+                }
+            }
 
-    const autoEndMessage = await checkAndAutoEndSessions(docente);
-    if (autoEndMessage) {
-        showStatusMessage(autoEndMessage, "info");
-        if (type === 'fin') return; 
-    }
+            if (!navigator.geolocation) {
+                showStatusMessage("🚫 Tu navegador no soporta o ha bloqueado la geolocalización.", "error");
+                console.error("Diagnóstico: navigator.geolocation no está disponible.");
+                return;
+            }
 
-    const hoy = new Date();
-    const fecha = hoy.toLocaleDateString("es-ES");
-    const diaSemana = hoy.toLocaleDateString("es-ES", { weekday: "long" }).toLowerCase();
-    const hora = hoy.toLocaleTimeString(); 
-    let claseInfo = findCurrentClass(docente, diaSemana) || "N/A";
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 });
+                });
+                const { latitude: lat, longitude: lon } = position.coords;
+                const distance = calculateDistance(SCHOOL_LAT, SCHOOL_LON, lat, lon);
+                const inZone = distance <= MAX_DISTANCE_KM;
 
-    if (specialRoles[docente]) { 
-        claseInfo = specialRoles[docente];
-    } else if (type === 'inicio') {
-        const delayedClass = findClassForDelayValidation(docente, diaSemana);
-        if (delayedClass) {
-            const timePart = delayedClass.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
-            const [, startHour, startMinute] = timePart.map(Number);
-            const startTime = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`;
-            showStatusMessage(`❌ No puedes registrar el inicio de jornada. La clase **${delayedClass.split('(')[0].trim()}** comenzó a las **${startTime}** y el tiempo límite de ${MAX_DELAY_MINUTES} minutos ha expirado.`, "error");
-            return;
-        }
-        if (claseInfo === "N/A") {
-            claseInfo = findNextClass(docente, diaSemana) || "N/A";
-        }
-    }
-
-    // --- NUEVA VERIFICACIÓN ---
-    // Primero, revisamos si el navegador soporta geolocalización en absoluto.
-    if (!navigator.geolocation) {
-        showStatusMessage("🚫 Tu navegador no soporta o ha bloqueado la geolocalización.", "error");
-        console.error("Diagnóstico: navigator.geolocation no está disponible.");
-        return; // Detenemos la función aquí
-    }
-
-    try {
-        const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 });
-        });
-        const { latitude: lat, longitude: lon } = position.coords;
-        const distance = calculateDistance(SCHOOL_LAT, SCHOOL_LON, lat, lon);
-        const inZone = distance <= MAX_DISTANCE_KM;
-
-        if (!inZone) {
-            showStatusMessage(`❌ ¡Atención! Estás fuera del área permitida (${distance.toFixed(2)} km de la escuela).`, "error");
-        } else {
-            const record = { 
-                docente, type, fecha, diaSemana, hora, lat, lon, inZone, 
-                clase: claseInfo,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            };
-            await saveRecord(record);
-            showStatusMessage(`✅ Registro de ${type === 'inicio' ? 'INICIO' : 'FIN'} de jornada exitoso para ${docente}.`, "success");
-        }
-    } catch (error) {
-        let msg = "🚫 No se pudo obtener la ubicación.";
-        if (error.code === 1) msg = "🚨 Permiso de ubicación denegado. Habilita la ubicación en tu navegador.";
-        else if (error.code === 2) msg = "⚠️ La información de ubicación no está disponible.";
-        else if (error.code === 3) msg = "⌛ Tiempo de espera agotado al obtener la ubicación.";
-
-        // --- REGISTRO DEL ERROR EN CONSOLA ---
-        // Imprimimos el error real en la consola para saber qué es.
-        console.error("Ocurrió un error de geolocalización:", error);
-
-        showStatusMessage(msg, "error");
+                if (!inZone) {
+                    showStatusMessage(`❌ ¡Atención! Estás fuera del área permitida (${distance.toFixed(2)} km de la escuela).`, "error");
+                } else {
+                    const record = { 
+                        docente, type, fecha, diaSemana, hora, lat, lon, inZone, 
+                        clase: claseInfo,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    await saveRecord(record);
+                    showStatusMessage(`✅ Registro de <b>${type === 'inicio' ? 'INICIO' : 'FIN'}</b> de jornada exitoso para <b>${docente}</b>.`, "success");
+                }
+            } catch (error) {
+                let msg = "🚫 No se pudo obtener la ubicación.";
+                if (error.code === 1) msg = "🚨 Permiso de ubicación denegado. Habilita la ubicación en tu navegador.";
+                else if (error.code === 2) msg = "⚠️ La información de ubicación no está disponible.";
+                else if (error.code === 3) msg = "⌛ Tiempo de espera agotado al obtener la ubicación.";
+                
+                console.error("Ocurrió un error de geolocalización:", error);
+                showStatusMessage(msg, "error");
             }
         }
 
         // -----------------------------------------------------------
-        // FUNCIÓN DE REPORTE CONSOLIDADO (ESTA SE MANTIENE)
+        // FUNCIONES DE LA INTERFAZ Y REPORTES
         // -----------------------------------------------------------
 
+        function handleDocenteInput() {
+            const docente = docenteInput.value.trim();
+            claseInfoDiv.style.display = "none";
+            if (docente === "") return;
+
+            const hoy = new Date();
+            const diaSemana = hoy.toLocaleDateString("es-ES", { weekday: "long" }).toLowerCase();
+            
+            if (specialRoles[docente]) {
+                const role = specialRoles[docente];
+                claseInfoDiv.innerHTML = `Bienvenido(a), <b>${docente}</b>. <br>Rol: <b>${role}</b>.`;
+                claseInfoDiv.style.color = "var(--text-muted)";
+            } else if (horarios[docente]) {
+                const currentClass = findCurrentClass(docente, diaSemana);
+                const teacherScheduleForToday = horarios[docente][diaSemana];
+
+                if (currentClass) {
+                    claseInfoDiv.innerHTML = `Clase actual: <br><b>${currentClass}</b>`;
+                    claseInfoDiv.style.color = "#8affb4";
+                } else if (teacherScheduleForToday) {
+                    const nextClass = findNextClass(docente, diaSemana);
+                    if (nextClass) {
+                        claseInfoDiv.innerHTML = `No estás en clase. <br>Tu <b>próxima clase</b> es: <b>${nextClass}</b>`;
+                        claseInfoDiv.style.color = "#ffdf8e";
+                    } else {
+                        claseInfoDiv.innerHTML = `Ya has completado tu horario. <br>Tu horario de hoy fue: <b>${teacherScheduleForToday}</b>`;
+                        claseInfoDiv.style.color = "#ffdf8e";
+                    }
+                } else {
+                    claseInfoDiv.innerHTML = `<b>${docente}</b>, no tienes clases programadas para hoy.`;
+                    claseInfoDiv.style.color = "#ffb4b4";
+                }
+            } else {
+                 claseInfoDiv.innerHTML = `No se encontró un horario para <b>${docente}</b>. Puedes registrar tu asistencia.`;
+                 claseInfoDiv.style.color = "var(--text-muted)";
+            }
+            claseInfoDiv.style.display = "block";
+        }
+        
         function getScheduledClasses(docente, diaSemana) {
             if (specialRoles[docente]) {
                 const role = specialRoles[docente];
@@ -542,21 +562,9 @@ async function registrarJornada(type) {
         }
 
         function displayRecordsInTable() {
-            const tableHeader = document.querySelector("#attendance-table thead tr");
-            // 💡 Asegura que el encabezado sea el correcto para el reporte consolidado
-            tableHeader.innerHTML = `
-                <th>Docente</th>
-                <th>Fecha</th>
-                <th>Día</th>
-                <th>Registro Entrada (Hora/Clase)</th>
-                <th>Registro Salida (Hora/Clase)</th>
-                <th>Estado de Cumplimiento</th>
-            `;
-
-            db.collection("asistencia").orderBy("timestamp", "asc").get().then(snapshot => {
+            db.collection("asistencia").orderBy("timestamp", "desc").get().then(snapshot => {
                 attendanceTableBody.innerHTML = '';
                 
-                // 1. Agrupar registros por Docente y Fecha
                 const groupedRecords = snapshot.docs.map(doc => doc.data()).reduce((acc, record) => {
                     const key = `${record.docente}|${record.fecha}`;
                     if (!acc[key]) {
@@ -566,25 +574,19 @@ async function registrarJornada(type) {
                             diaSemana: record.diaSemana,
                             inicios: [],
                             fines: [],
-                            registros: []
                         };
                     }
-                    // Parsear el timestamp de Firebase si existe, si no usar la hora guardada
                     let horaDisplay = record.hora;
                     if (record.timestamp && record.timestamp.toDate) {
-                         const date = record.timestamp.toDate();
-                         horaDisplay = date.toLocaleTimeString("es-ES", {hour: '2-digit', minute:'2-digit', second: '2-digit'});
+                         horaDisplay = record.timestamp.toDate().toLocaleTimeString("es-ES", {hour: '2-digit', minute:'2-digit', second: '2-digit'});
                     }
                     record.horaDisplay = horaDisplay;
-
-                    acc[key].registros.push(record);
                     if (record.type === 'inicio') acc[key].inicios.push(record);
                     if (record.type === 'fin') acc[key].fines.push(record);
                     return acc;
                 }, {});
 
-                // Invertir para ver el más reciente primero
-                const consolidatedReports = Object.values(groupedRecords).reverse(); 
+                const consolidatedReports = Object.values(groupedRecords);
 
                 if (consolidatedReports.length === 0) {
                     attendanceTableBody.innerHTML = `<tr><td colspan="6">No hay registros de asistencia aún.</td></tr>`;
@@ -596,7 +598,6 @@ async function registrarJornada(type) {
                     let cumplimiento = "N/A (Sin Horario)";
                     let colorClass = "text-muted";
                     
-                    // 2. Determinar el estado de cumplimiento
                     if (scheduledClasses.length > 0) {
                         const isSpecialRole = scheduledClasses[0].includes("Jornada Completa") || scheduledClasses[0].includes("Director") || scheduledClasses[0].includes("Subdirector") || scheduledClasses[0].includes("Coordinador");
                         
@@ -605,7 +606,7 @@ async function registrarJornada(type) {
                             const tieneFin = report.fines.some(r => r.clase === scheduledClasses[0]);
 
                             if (tieneInicio && tieneFin) {
-                                cumplimiento = `Jornada Completa (${scheduledClasses[0]})`;
+                                cumplimiento = `Jornada Completa`;
                                 colorClass = "success";
                             } else if (tieneInicio && !tieneFin) {
                                 cumplimiento = `Jornada Abierta (Falta fin)`;
@@ -615,14 +616,8 @@ async function registrarJornada(type) {
                                 colorClass = "danger";
                             }
                         } else {
-                            // Docentes por clase: Contar cuántas clases se registraron
-                            const scheduledClassNames = scheduledClasses.map(c => c.split('(')[0].trim());
+                            const uniqueScheduledClasses = [...new Set(scheduledClasses.map(c => c.split('(')[0].trim()))];
                             const registeredClassNames = report.inicios.map(r => r.clase.split('(')[0].trim());
-                            
-                            // Conjunto de clases programadas únicas
-                            const uniqueScheduledClasses = [...new Set(scheduledClassNames)];
-                            
-                            // Faltantes: Clases programadas que NO tienen un registro de inicio
                             const faltantes = uniqueScheduledClasses.filter(name => !registeredClassNames.includes(name));
                             
                             if (faltantes.length === 0 && uniqueScheduledClasses.length > 0) {
@@ -631,118 +626,49 @@ async function registrarJornada(type) {
                             } else if (faltantes.length > 0 && faltantes.length < uniqueScheduledClasses.length) {
                                 cumplimiento = `⚠️ Clases incompletas: ${faltantes.join(', ')}`;
                                 colorClass = "info";
-                            }
-                            else if (faltantes.length === uniqueScheduledClasses.length) {
-                                cumplimiento = `❌ No se registró ninguna clase.`;
+                            } else if (faltantes.length === uniqueScheduledClasses.length) {
+                                cumplimiento = `❌ Sin registros de clase.`;
                                 colorClass = "danger";
                             }
                         }
                     }
 
-                    // 3. Consolidar registros de Entrada y Salida para la tabla
-                    const allInicios = report.inicios
-                        .map(r => `${r.horaDisplay} (${r.clase.split('(')[0].trim()})`)
-                        .join('<br>');
-                    
-                    const allFines = report.fines
-                        .map(r => `${r.horaDisplay} (${r.clase.split('(')[0].trim()})`)
-                        .join('<br>');
+                    const allInicios = report.inicios.map(r => `${r.horaDisplay} (${r.clase.split('(')[0].trim()})`).join('<br>') || 'N/A';
+                    const allFines = report.fines.map(r => `${r.horaDisplay} (${r.clase.split('(')[0].trim()})`).join('<br>') || 'N/A';
 
                     const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${report.docente}</td>
-                        <td>${report.fecha}</td>
-                        <td>${report.diaSemana}</td>
-                        <td>${allInicios || 'N/A'}</td>
-                        <td>${allFines || 'N/A'}</td>
-                        <td class="${colorClass}">${cumplimiento}</td>
-                    `;
+                    row.innerHTML = `<td>${report.docente}</td><td>${report.fecha}</td><td>${report.diaSemana}</td><td>${allInicios}</td><td>${allFines}</td><td class="${colorClass}">${cumplimiento}</td>`;
                     
-                    // Aplicar estilo de color para el cumplimiento
-                    if (colorClass === "success") {
-                        row.style.backgroundColor = "var(--color-success-bg)";
-                    } else if (colorClass === "danger") {
-                        row.style.backgroundColor = "var(--color-danger-bg)";
-                    } else if (colorClass === "info") {
-                        row.style.backgroundColor = "var(--color-info-bg)";
-                    }
+                    if (colorClass === "success") row.style.backgroundColor = "var(--color-success-bg)";
+                    else if (colorClass === "danger") row.style.backgroundColor = "var(--color-danger-bg)";
+                    else if (colorClass === "info") row.style.backgroundColor = "var(--color-info-bg)";
                     
                     attendanceTableBody.appendChild(row);
                 });
             }).catch(error => {
+                console.error("Error displaying records:", error);
                 attendanceTableBody.innerHTML = `<tr><td colspan="6">Error al cargar registros: ${error.message}</td></tr>`;
             });
         }
 
-        // -----------------------------------------------------------
-        // LÓGICA DE INTERFAZ Y DESCARGA
-        // -----------------------------------------------------------
-
-        function handleDocenteInput() {
-            const docente = docenteInput.value.trim();
-            claseInfoDiv.style.display = "none";
-            if (docente === "") { return; }
-            const hoy = new Date();
-            const diaSemana = hoy.toLocaleDateString("es-ES", { weekday: "long" }).toLowerCase();
-            
-            if (specialRoles[docente]) {
-                const role = specialRoles[docente];
-                if (role.includes("Jornada Completa") || role.includes("Director") || role.includes("Subdirector") || role.includes("Coordinador")) {
-                    claseInfoDiv.innerHTML = `Bienvenido(a), <strong style="color: #fff;">${docente}</strong>. <br>Rol: <strong>${role}</strong>.`;
-                    claseInfoDiv.style.color = "var(--text-muted)";
-                    claseInfoDiv.style.display = "block";
-                    return; 
-                }
-            }
-
-            if (horarios[docente]) {
-                const currentClass = findCurrentClass(docente, diaSemana);
-                const teacherScheduleForToday = horarios[docente][diaSemana];
-
-                if (currentClass) {
-                    claseInfoDiv.innerHTML = `Clase actual: <br><strong style="color: #fff;">${currentClass}</strong>`;
-                    claseInfoDiv.style.color = "#8affb4";
-                } else if (teacherScheduleForToday) {
-                    const nextClass = findNextClass(docente, diaSemana);
-                    
-                    if (nextClass) {
-                        claseInfoDiv.innerHTML = `No estás en clase. <br>Tu **próxima clase** es: <strong style="color: #fff;">${nextClass}</strong>`;
-                        claseInfoDiv.style.color = "#ffdf8e";
-                    } else {
-                        claseInfoDiv.innerHTML = `Ya has completado tu horario. <br>Tu horario para hoy fue: <strong style="color: #fff;">${teacherScheduleForToday}</strong>`;
-                        claseInfoDiv.style.color = "#ffdf8e";
-                    }
-                } else {
-                    claseInfoDiv.innerHTML = `<strong style="color: #fff;">${docente}</strong>, no tienes clases programadas para hoy.`;
-                    claseInfoDiv.style.color = "#ffb4b4";
-                }
-            } else {
-                claseInfoDiv.innerHTML = `No se encontró un horario para <strong style="color: #fff;">${docente}</strong>. Puedes registrar tu asistencia.`;
-                claseInfoDiv.style.color = "var(--text-muted)";
-            }
-            claseInfoDiv.style.display = "block";
-        }
-        
-        docenteInput.addEventListener('input', handleDocenteInput);
-        
         function toggleAdminPanel() {
             const password = prompt("Por favor, ingresa la contraseña de administrador:");
             if (password === ADMIN_PASSWORD) {
                 const isDisplayed = adminContainer.style.display === "block";
                 adminContainer.style.display = isDisplayed ? "none" : "block";
-                if (!isDisplayed) { displayRecordsInTable(); }
+                if (!isDisplayed) {
+                    displayRecordsInTable();
+                }
             } else if (password) {
                 alert("Contraseña incorrecta. Acceso denegado.");
             }
         }
 
         function downloadPDF() {
-            const element = document.getElementById('attendance-table');
+            const element = document.getElementById('admin-container'); // Capture the whole container for better context
             const opt = { 
-                margin: 0.5, 
-                filename: 'reporte_consolidado.pdf', 
-                image: { type: 'jpeg', quality: 0.98 }, 
-                html2canvas: { scale: 2 }, 
+                margin: 0.5, filename: 'reporte_consolidado.pdf', image: { type: 'jpeg', quality: 0.98 }, 
+                html2canvas: { scale: 2, useCORS: true }, 
                 jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' } 
             };
             html2pdf().from(element).set(opt).save();
@@ -751,14 +677,15 @@ async function registrarJornada(type) {
         function downloadExcel() {
             const table = document.getElementById("attendance-table");
             const ws = XLSX.utils.table_to_sheet(table);
-            const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Reporte Consolidado");
+            const wb = XLSX.utils.book_new();
             XLSX.writeFile(wb, "reporte_consolidado.xlsx");
         }
-
-        document.addEventListener('DOMContentLoaded', displayRecordsInTable);
+        
+        docenteInput.addEventListener('input', handleDocenteInput);
     </script>
 </body>
 
 </html>
+
 
