@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Registro de Asistencia - San Carlos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        :root {
+            --bg-1: #0f172a;
+            --card-bg: rgba(15, 23, 42, 0.7);
+            --accent: #0ea5a3;
+            --text-light: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --success: #28a745;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --primary: #007bff;
+            /* Nuevos colores para el reporte */
+            --color-success-bg: rgba(40, 167, 69, 0.1);
+            --color-danger-bg: rgba(220, 53, 69, 0.1);
+            --color-info-bg: rgba(23, 162, 184, 0.1);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            background: linear-gradient(135deg, #071126 0%, #0d3b4b 50%, #062031 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-light);
+        }
+
+        .wrapper { width: 100%; max-width: 1120px; padding: 32px; }
+        .grid { display: grid; grid-template-columns: 1fr 420px; gap: 48px; align-items: center; }
+        .left { color: rgba(255, 255, 255, 0.95); }
+        .brand { display: flex; gap: 16px; align-items: center; }
+        
+        /* === ESTILO DEL LOGO MODIFICADO === */
+        .logo { 
+            width: 64px; height: 64px; border-radius: 12px; 
+            background: linear-gradient(135deg, var(--accent), #0369a1); /* <-- ¡Este es el cambio! */
+            display: flex; align-items: center; justify-content: center; 
+            color: white; font-weight: 700; font-size: 20px; overflow: hidden;
+        }
+        .logo img { height: 100%; width: 100%; object-fit: contain; }
+        h1 { font-size: 28px; margin: 16px 0; }
+        p.lead { color: rgba(255, 255, 255, 0.8); line-height: 1.6; }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 28px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 6px 30px rgba(2, 6, 23, 0.6);
+            border: 1px solid var(--border-color);
+        }
+
+        label { font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 6px; }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-light);
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        input[type="text"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(14, 165, 163, 0.3);
+        }
+
+        .button-group { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 12px 25px; font-size: 16px; border: none; border-radius: 8px;
+            cursor: pointer; transition: background-color 0.3s, transform 0.2s;
+            color: white; font-weight: 600;
+        }
+        .btn:hover { transform: translateY(-2px); }
+
+        .btn.start { background-color: var(--success); }
+        .btn.start:hover { background-color: #218838; }
+        .btn.end { background-color: var(--danger); }
+        .btn.end:hover { background-color: #c82333; }
+        
+        .admin-button-container { text-align: center; margin-top: 24px; }
+        .btn.admin { background-color: var(--info); }
+        .btn.admin:hover { background-color: #138496; }
+        
+        .btn.download { background-color: var(--primary); }
+        .btn.download:hover { background-color: #0069d9; }
+        
+        .footer { text-align: center; margin-top: 24px; color: rgba(255, 255, 255, 0.65); font-size: 14px; }
+        
+        /* Estilos de la aplicación de Asistencia adaptados */
+        .clase-info {
+            font-size: 1.1em;
+            margin-top: 20px;
+            margin-bottom: 0;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .alert {
+            padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 1em;
+            font-weight: 500; text-align: center;
+        }
+        .alert.success { background-color: rgba(40, 167, 69, 0.2); color: #8affb4; border: 1px solid var(--success); }
+        .alert.error { background-color: rgba(220, 53, 69, 0.2); color: #ffb4b4; border: 1px solid var(--danger); }
+        .alert.info { background-color: rgba(23, 162, 184, 0.2); color: #8ecfff; border: 1px solid var(--info); }
+        
+        .admin-container {
+            display: none; /* Oculto por defecto */
+            margin-top: 24px;
+        }
+        .table-container { overflow-x: auto; }
+        
+        #attendance-table {
+            width: 100%; border-collapse: collapse; margin-top: 20px;
+        }
+        #attendance-table th, #attendance-table td {
+            border: 1px solid var(--border-color);
+            padding: 12px; text-align: left; font-size: 0.9em;
+        }
+        #attendance-table th {
+            background-color: rgba(255, 255, 255, 0.05); color: var(--text-muted);
+            font-weight: bold;
+        }
+        #attendance-table tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.02); }
+
+        /* Estilos para el nuevo reporte consolidado */
+        #attendance-table .success { color: var(--success); }
+        #attendance-table .danger { color: var(--danger); }
+        #attendance-table .info { color: var(--info); }
+        #attendance-table tr[style*="background-color: var(--color-success-bg)"] { background-color: var(--color-success-bg); }
+        #attendance-table tr[style*="background-color: var(--color-danger-bg)"] { background-color: var(--color-danger-bg); }
+        #attendance-table tr[style*="background-color: var(--color-info-bg)"] { background-color: var(--color-info-bg); }
+
+
+        .download-buttons { margin-top: 20px; margin-bottom: 10px; display: flex; justify-content: center; gap: 15px; }
+
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+            .left { order: 2; text-align: center; }
+            .brand { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="grid">
+            <div class="left">
+                <div class="brand">
+                    <div class="logo">
+                        <img src="logo.png" alt="Logo del Instituto" style="height: 100%; width: 100%; object-fit: contain;">
+                    </div>
+                    <div>
+                        <div style="font-weight:700;font-size:18px">Instituto San Carlos</div>
+                        <div style="font-size:13px;color:rgba(255,255,255,0.7)">Plataforma de Asistencia</div>
+                    </div>
+                </div>
+                <h1>Registro de Jornada Docente</h1>
+                <p class="lead">Ingresa tu nombre completo para ver tu clase actual y registrar tu entrada o salida. Tu ubicación será verificada.</p>
+            </div>
+
+            <div>
+                <div class="card">
+                    <div style="font-weight:700; font-size: 18px; text-align: center; margin-bottom: 20px;">Registra tu Asistencia</div>
+                    
+                    <div>
+                        <label for="docente">Nombre completo del docente</label>
+                        <input type="text" id="docente" placeholder="Ej. Ana María Ruiz Cabrera">
+                    </div>
+
+                    <div class="clase-info" id="clase-info" style="display:none;"></div>
+                    
+                    <div class="button-group">
+                        <button class="btn start" onclick="registrarJornada('inicio')">▶️ Inicio de Jornada</button>
+                        <button class="btn end" onclick="registrarJornada('fin')">⏹️ Fin de Jornada</button>
+                    </div>
+
+                    <div id="status-message" class="alert" style="display:none;"></div>
+                </div>
+                
+                <div class="admin-button-container">
+                    <button class="btn admin" onclick="toggleAdminPanel()">📋 Ver Registros</button>
+                </div>
+
+            </div>
+        </div>
+        
+        <div id="admin-container" class="admin-container card">
+            <h2 style="text-align:center; color: var(--text-light);">Panel de Reporte Consolidado</h2>
+            <div class="download-buttons">
+                <button class="btn download" onclick="downloadPDF()">📄 Descargar PDF</button>
+                <button class="btn download" onclick="downloadExcel()">📊 Descargar Excel</button>
+            </div>
+            <div class="table-container">
+                <table id="attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Docente</th>
+                            <th>Fecha</th>
+                            <th>Día</th>
+                            <th>Registro Entrada (Hora/Clase)</th>
+                            <th>Registro Salida (Hora/Clase)</th>
+                            <th>Estado de Cumplimiento</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="footer">© <span id="y"></span> Instituto Educativo San Carlos</div>
+    </div>
+
+    <script>
+        // -----------------------------------------------------------
+        // CONSTANTES
+        // -----------------------------------------------------------
+        const SCHOOL_LAT = 19.560137;
+        const SCHOOL_LON = -97.238952;
+        const MAX_DISTANCE_KM = 0.15;
+        const ADMIN_PASSWORD = "IEC25#";
+        const MAX_DELAY_MINUTES = 10; 
+        
+        // CONSTANTES para auto-finalización de roles especiales (Jornada 7:40 - 15:40)
+        const ADMIN_START_TIME = "07:40:00";
+        const ADMIN_END_TIME = "15:40:00";
+        const ADMIN_END_TIME_MINUTES = 15 * 60 + 40; 
+
+        const horarios = {
+            "Coral Alejandra Landa Hernández": {"jueves": "Ciencias Sociales I (09:40-10:30)","viernes": "Ciencias Sociales I (10:30-11:20)","lunes": "Ciencias Sociales I (10:30-11:20) / Ciencias de la Comunicación (08:00-08:50)","martes": "Ciencias de la Comunicación (10:30-11:20)","miércoles": "Ciencias de la Comunicación (08:00-08:50)"},
+            "Héctor Vicente Flores González": {"lunes": "Pensamiento Matemático I (10:30-11:20) / Pensamiento Matemático III (08:00-08:50) / Pensamiento Matemático I (12:50-13:40) / Cálculo Diferencial (08:50-09:40) / La Energía en los Procesos de la Vida Diaria (09:40-10:30)","martes": "Pensamiento Matemático I (12:50-13:40) / Pensamiento Matemático III (08:50-09:40) / Temas Selectos de Física (10:30-11:20) / Temas Selectos de Química (08:00-08:50)","miércoles": "Pensamiento Matemático I (13:40-14:30) / Pensamiento Matemático I (12:50-13:40) / Pensamiento Matemático III (12:00-12:50) / Cálculo Diferencial (08:00-08:50) / Temas Selectos de Química (08:50-09:40) / La Energía en los Procesos de la Vida Diaria (10:30-11:20)","jueves": "Pensamiento Matemático I (13:40-14:30) / Pensamiento Matemático III (10:30-11:20) / Pensamiento Matemático III (09:40-10:30) / Temas Selectos de Física (08:50-09:40) / Cálculo Diferencial (08:00-08:50) / La Energía en los Procesos de la Vida Diaria (12:50-13:40)","viernes": "Pensamiento Matemático I (09:40-10:30) / Pensamiento Matemático I (08:00-08:50) / Pensamiento Matemático III (12:50-13:40) / Pensamiento Matemático III (08:00-08:50) / Temas Selectos de Física (12:00-12:50) / Temas Selectos de Química (13:40-14:30) / La Energía en los Procesos de la Vida Diaria (10:30-11:20)"},
+            "Cheideny Magaly Oliveros Castrejón": {"martes": "Taller de Desarrollo Sustentable (13:40-14:30) / Taller de Desarrollo Sustentable (08:50-09:40) / Desarrollo Comunitario (CFLB) (09:40-10:30)","miércoles": "Taller de Desarrollo Sustentable (12:00-12:50) / Desarrollo Comunitario (CFLB) (09:40-11:20)","jueves": "Taller de Desarrollo Sustentable (12:50-13:40)","lunes": "Taller de Desarrollo Sustentable (13:40-14:30) / Desarrollo Comunitario (CFLB) (09:40-11:20)","viernes": "Taller de Desarrollo Sustentable (12:50-13:40) / Desarrollo Comunitario (CFLB) (09:40-11:20)"},
+            "José Idai Zamora Munguia": {"lunes": "Cultura Digital I (08:50-09:40)","martes": "Cultura Digital I (09:40-10:30)","miércoles": "Cultura Digital I (10:30-11:20)","jueves": "Cultura Digital I (12:00-12:50)","viernes": "Cultura Digital I (13:40-14:30) / Cultura Digital I (10:30-11:20)"},
+            "Brenda Sofía Hernández Amado": {"martes": "Historia del Arte (08:00-08:50)","jueves": "Historia del Arte (08:50-09:40)","viernes": "Historia del Arte (13:40-14:30)"},
+            "Diana Laura Enciso Parada": {"lunes": "Inglés (08:00-08:50) / Inglés II (13:40-14:30) / Traducción e Interpretación del Idioma Inglés (CFLB) (12:50-13:40)","martes": "Inglés II (08:00-08:50) / Traducción e Interpretación del Idioma Inglés (CFLB) (12:00-12:50)","miércoles": "Inglés (08:00-08:50) / Traducción e Interpretación del Idioma Inglés (CFLB) (12:00-13:40)","jueves": "Inglés (08:00-08:50) / Inglés II (08:50-09:40)","viernes": "Inglés (08:50-09:40) / Inglés II (08:00-08:50) / Traducción e Interpretación del Idioma Inglés (CFLB) (12:50-13:40)"},
+            "Iridian Herrera Oropeza": {"lunes": "Humanidades I (12:00-12:50) / Humanidades I (08:50-09:40) / Administración (CFLB) (09:40-11:20) / Derecho (08:00-08:50) / Conciencia Historica II Mexico Durante el Expansionismo (09:40-10:30) / Administración (CFLB) (12:50-13:40)","martes": "Humanidades I (10:30-11:20) / Administración (CFLB) (09:40-10:30) / Derecho (08:50-09:40) / Conciencia Historica II Mexico Durante el Expansionismo (09:40-10:30) / Administración (CFLB) (12:00-12:50)","miércoles": "Humanidades I (09:40-10:30) / Humanidades I (08:50-09:40) / Administración (CFLB) (09:40-11:20) / Conciencia Historica II Mexico Durante el Expansionismo (12:50-13:40) / Administración (CFLB) (12:00-13:40)","jueves": "Humanidades I (12:00-12:50) / Humanidades I (08:50-09:40) / Conciencia Historica II Mexico Durante el Expansionismo (12:50-13:40) / Conciencia Historica II Mexico Durante el Expansionismo (13:40-14:30)","viernes": "Derecho (08:00-08:50) / Conciencia Historica II Mexico Durante el Expansionismo (09:40-10:30) / Conciencia Historica II Mexico Durante el Expansionismo (09:40-10:30) / Administración (CFLB) (09:40-11:20) / Administración (CFLB) (12:50-13:40)"},
+            "Javier Arroyo Daza": {"lunes": "Inglés (08:00-08:50)","miércoles": "Inglés (08:00-08:50)","jueves": "Inglés (08:00-08:50)","viernes": "Inglés (08:50-09:40)"},
+            "Laura Verónica Adauta Rodríguez": {"lunes": "Administración (CFLB) (09:40-11:20) / Administración (08:50-09:40)","martes": "Administración (CFLB) (09:40-10:30) / Contabilidad (08:50-09:40) / Economía (08:00-08:50) / Administración (CFLB) (12:00-12:50)","miércoles": "Administración (CFLB) (09:40-11:20) / Administración (08:50-09:40) / Administración (CFLB) (12:00-13:40)","jueves": "Contabilidad (08:00-08:50) / Economía (08:50-09:40)","viernes": "Administración (CFLB) (09:40-11:20) / Contabilidad (12:00-12:50) / Administración (08:00-08:50) / Economía (13:40-14:30) / Administración (CFLB) (12:50-13:40)"},
+            "Luis Fernando Herrera Reyes": {"lunes": "Traducción e Interpretación del Idioma Inglés (CFLB) (12:50-13:40) / Inglés V (12:00-12:50) / Inglés III (13:40-14:30)","martes": "Traducción e Interpretación del Idioma Inglés (CFLB) (12:00-12:50) / Inglés V (12:50-13:40) / Inglés III (08:00-08:50)","miércoles": "Traducción e Interpretación del Idioma Inglés (CFLB) (12:00-13:40) / Inglés V (12:00-12:50)","jueves": "Inglés V (12:00-12:50) / Inglés III (08:50-09:40)","viernes": "Traducción e Interpretación del Idioma Inglés (CFLB) (12:50-13:40) / Inglés V (08:50-09:40)"},
+            "Monica Ivette Gonzalez Flores": {"lunes": "Inglés V (12:00-12:50)","martes": "Inglés V (12:50-13:40)","jueves": "Inglés V (12:00-12:50)","viernes": "Inglés V (08:50-09:40)"},
+            "Pedro Hernandez García": {"martes": "Educación Física (12:50-13:40) / Educación Física (10:30-11:20) / Educación Física (08:50-09:40)","jueves": "Educación Física (12:50-13:40)","miércoles": "Educación Física (09:40-10:30)","lunes": "Educación Física (10:30-11:20)"},
+            "Eduardo Yokanán Tejeda Juárez": {"lunes": "Humanidades III (12:00-12:50) / Humanidades III (12:50-13:40) / logica (08:00-08:50) / Temas Selectos de Filosofía I (08:50-09:40)","martes": "Humanidades III (12:00-12:50) / Humanidades III (12:50-13:40) / logica (08:50-09:40) / Sociología (10:30-11:20)","miércoles": "Humanidades III (13:40-14:30) / Humanidades III (12:50-13:40) / Sociología (08:50-09:40) / Temas Selectos de Filosofía I (08:00-08:50)","jueves": "Humanidades III (09:40-10:30) / Humanidades III (10:30-11:20) / Sociología (08:00-08:50)","viernes": "Humanidades III (08:50-09:40) / Humanidades III (12:50-13:40) / logica (08:00-08:50) / Temas Selectos de Filosofía I (12:00-12:50)"},
+            "Milagros Ruiz Avilés": {"lunes": "Formación Socioemocional (09:40-10:30) / Psicología (08:50-09:40)","martes": "Formación Socioemocional I (08:00-08:50) / Formación Socioemocional (13:40-14:30)","miércoles": "Orientación Educativa (10:30-11:20) / Formación Socioemocional (12:00-12:50) / Orientación Educativa (08:00-08:50) / Formación Socioemocional (09:40-10:30) / Psicología (08:50-09:40)","jueves": "Formación Socioemocional (12:50-13:40) / Psicología (08:00-08:50)","viernes": "Formación Socioemocional I (08:00-08:50) / Orientación Educativa (12:50-13:40) / Orientación Educativa (12:00-12:50) / Formación Socioemocional (09:40-10:30)"},
+        };
+        const specialRoles = {"Leoncio Dionisio Castillo González": "Docente de Jornada Completa", "Suly Morales Reyes": "Docente de Jornada Completa", "Ángel González Alejo": "Docente de Jornada Completa", "Martín Alejandro Rivadeneyra Ferrón": "Subdirector Bachillerato", "Erick David Villegas Martinez": "Coordinador Académico", "Alicia Karina Pineda Bautista": "Subdirectora Secundaría", "Yesika Cecilia Robledo Taboada": "Directora General", "Taimi Sánchez Rodríguez": "Subdirectora Preescolar", "Martha Patricia Ruiz Díaz": "Subdirectora Primaria", "Ana María Ruiz Cabrera": "Coordinadora Inglés"};
+
+        const statusMessageDiv = document.getElementById("status-message");
+        const adminContainer = document.getElementById("admin-container");
+        const attendanceTableBody = document.querySelector("#attendance-table tbody");
+        const docenteInput = document.getElementById("docente");
+        const claseInfoDiv = document.getElementById("clase-info");
+
+        const firebaseConfig = { apiKey: "AIzaSyCe_gPI05ikktu8gP9hgM9FiMwjQXHvgeo", authDomain: "asistenciaescuela-f9afe.firebaseapp.com", projectId: "asistenciaescuela-f9afe", storageBucket: "asistenciaescuela-f9afe.appspot.com", messagingSenderId: "316634671110", appId: "1:316634671110:web:861136075d0e990c1ffb87" };
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = app.firestore();
+        
+        document.getElementById('y').textContent = new Date().getFullYear();
+
+        // -----------------------------------------------------------
+        // FUNCIONES DE UTILIDAD Y BÚSQUEDA
+        // -----------------------------------------------------------
+
+        function findCurrentClass(docente, diaSemana) {
+            const currentHour = new Date().getHours();
+            const currentMinute = new Date().getMinutes();
+            const currentTimeInMinutes = currentHour * 60 + currentMinute;
+            const teacherSchedule = horarios[docente]?.[diaSemana];
+            if (!teacherSchedule) { return undefined; }
+            const classes = teacherSchedule.split(' / ');
+            
+            let currentClass = classes.find(clase => {
+                const timePart = clase.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
+                if (timePart) {
+                    const [, startHour, startMinute, endHour, endMinute] = timePart.map(Number);
+                    const startTimeInMinutes = startHour * 60 + startMinute;
+                    const endTimeInMinutes = endHour * 60 + endMinute;
+                    return (currentTimeInMinutes >= startTimeInMinutes && currentTimeInMinutes < endTimeInMinutes);
+                }
+                return false;
+            });
+            
+            return currentClass;
+        }
+        
+        function findClassForDelayValidation(docente, diaSemana) {
+            const currentHour = new Date().getHours();
+            const currentMinute = new Date().getMinutes();
+            const currentTimeInMinutes = currentHour * 60 + currentMinute;
+            const teacherSchedule = horarios[docente]?.[diaSemana];
+            if (!teacherSchedule) { return null; }
+
+            const classes = teacherSchedule.split(' / ');
+            
+            let classToValidate = classes.find(clase => {
+                const timePart = clase.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
+                if (timePart) {
+                    const [, startHour, startMinute] = timePart.map(Number);
+                    const startTimeInMinutes = startHour * 60 + startMinute;
+                    
+                    if (currentTimeInMinutes > startTimeInMinutes + MAX_DELAY_MINUTES) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+            return classToValidate;
+        }
+        
+        function findNextClass(docente, diaSemana) {
+            const currentHour = new Date().getHours();
+            const currentMinute = new Date().getMinutes();
+            const currentTimeInMinutes = currentHour * 60 + currentMinute;
+            const teacherSchedule = horarios[docente]?.[diaSemana];
+            if (!teacherSchedule) { return undefined; }
+
+            const classes = teacherSchedule.split(' / ');
+            let nextClass = null;
+            let minStartTime = Infinity;
+
+            classes.forEach(clase => {
+                const timePart = clase.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
+                if (timePart) {
+                    const [, startHour, startMinute] = timePart.map(Number);
+                    const startTimeInMinutes = startHour * 60 + startMinute;
+                    
+                    if (startTimeInMinutes > currentTimeInMinutes) {
+                        if (startTimeInMinutes < minStartTime) {
+                            minStartTime = startTimeInMinutes;
+                            nextClass = clase;
+                        }
+                    }
+                }
+            });
+            return nextClass;
+        }
+
+        function showStatusMessage(message, type) {
+            statusMessageDiv.textContent = message;
+            statusMessageDiv.className = `alert ${type}`;
+            statusMessageDiv.style.display = "block";
+        }
+
+        async function saveRecord(record) {
+            try {
+                await db.collection("asistencia").add(record);
+            } catch (error) {
+                showStatusMessage("Ocurrió un error al guardar tu registro. Inténtalo de nuevo.", "error");
+            }
+        }
+
+        // -----------------------------------------------------------
+        // LÓGICA DE AUTO-FINALIZACIÓN
+        // -----------------------------------------------------------
+
+        async function checkAndAutoEndSessions(docente) {
+            const hoy = new Date();
+            const diaSemana = hoy.toLocaleDateString("es-ES", { weekday: "long" }).toLowerCase();
+            const currentTimeInMinutes = hoy.getHours() * 60 + hoy.getMinutes();
+            
+            const lastRecordSnapshot = await db.collection("asistencia")
+                .where("docente", "==", docente)
+                .orderBy("timestamp", "desc")
+                .limit(1).get();
+
+            if (lastRecordSnapshot.empty) {
+                return null;
+            }
+
+            const lastRecord = lastRecordSnapshot.docs[0].data();
+
+            if (lastRecord.type !== "inicio" || lastRecord.fecha !== hoy.toLocaleDateString("es-ES")) {
+                return null;
+            }
+
+            const role = specialRoles[docente];
+            if (role && (role.includes("Jornada Completa") || role.includes("Director") || role.includes("Subdirector") || role.includes("Coordinador"))) {
+                if (currentTimeInMinutes > ADMIN_END_TIME_MINUTES) {
+                    const autoEndRecord = {
+                        docente,
+                        type: "fin",
+                        fecha: hoy.toLocaleDateString("es-ES"),
+                        diaSemana,
+                        hora: ADMIN_END_TIME, 
+                        lat: lastRecord.lat || SCHOOL_LAT, 
+                        lon: lastRecord.lon || SCHOOL_LON,
+                        inZone: true,
+                        clase: role,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    await saveRecord(autoEndRecord);
+                    return `✅ Jornada de **${docente}** (Rol: ${role}) finalizada automáticamente a las ${ADMIN_END_TIME}.`;
+                }
+            } 
+            else if (horarios[docente] && horarios[docente][diaSemana] && !role) {
+                const lastClassRegistered = lastRecord.clase;
+                const classTimeMatch = lastClassRegistered.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
+
+                if (classTimeMatch) {
+                    const [, , , endHour, endMinute] = classTimeMatch.map(Number);
+                    const classEndTimeInMinutes = endHour * 60 + endMinute;
+                    
+                    if (currentTimeInMinutes > classEndTimeInMinutes) {
+                        const [claseName] = lastClassRegistered.split(' (');
+                        const endTimeStr = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}:00`;
+
+                        const autoEndRecord = {
+                            docente,
+                            type: "fin",
+                            fecha: hoy.toLocaleDateString("es-ES"),
+                            diaSemana,
+                            hora: endTimeStr, 
+                            lat: lastRecord.lat || SCHOOL_LAT,
+                            lon: lastRecord.lon || SCHOOL_LON,
+                            inZone: true,
+                            clase: lastClassRegistered,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+                        await saveRecord(autoEndRecord);
+                        return `✅ Clase de **${claseName.trim()}** finalizada automáticamente a las ${endTimeStr}.`;
+                    }
+                }
+            }
+            return null;
+        }
+        
+        // -----------------------------------------------------------
+        // LÓGICA DE REGISTRO
+        // -----------------------------------------------------------
+
+        async function registrarJornada(type) {
+            statusMessageDiv.style.display = "none";
+            const docente = docenteInput.value.trim();
+            if (!docente) {
+                showStatusMessage("Por favor, ingresa tu nombre.", "error");
+                return;
+            }
+            
+            // Paso 1: Intentar Auto-Finalizar sesiones abiertas
+            const autoEndMessage = await checkAndAutoEndSessions(docente);
+            if (autoEndMessage) {
+                showStatusMessage(autoEndMessage, "info");
+                if (type === 'fin') return; 
+            }
+
+            const hoy = new Date();
+            const fecha = hoy.toLocaleDateString("es-ES");
+            const diaSemana = hoy.toLocaleDateString("es-ES", { weekday: "long" }).toLowerCase();
+            const hora = hoy.toLocaleTimeString(); 
+            let claseInfo = findCurrentClass(docente, diaSemana) || "N/A";
+            
+            if (specialRoles[docente]) { 
+                claseInfo = specialRoles[docente];
+            } else if (type === 'inicio') {
+                // Paso 2: VALIDACIÓN DE RETRASO
+                const delayedClass = findClassForDelayValidation(docente, diaSemana);
+                
+                if (delayedClass) {
+                    const timePart = delayedClass.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
+                    const [, startHour, startMinute] = timePart.map(Number);
+                    const startTime = `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`;
+                    
+                    showStatusMessage(`❌ No puedes registrar el inicio de jornada. La clase **${delayedClass.split('(')[0].trim()}** comenzó a las **${startTime}** y el tiempo límite de ${MAX_DELAY_MINUTES} minutos ha expirado.`, "error");
+                    return;
+                }
+                
+                // Si no hay clase actual, la clase para el registro debe ser la próxima clase
+                if (claseInfo === "N/A") {
+                    claseInfo = findNextClass(docente, diaSemana) || "N/A";
+                }
+            }
+
+
+            if (!navigator.geolocation) {
+                showStatusMessage("Tu navegador no soporta geolocalización.", "error");
+                return;
+            }
+
+            try {
+                const position = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+                });
+                const { latitude: lat, longitude: lon } = position.coords;
+                const distance = calculateDistance(SCHOOL_LAT, SCHOOL_LON, lat, lon);
+                const inZone = distance <= MAX_DISTANCE_KM;
+
+                if (!inZone) {
+                    showStatusMessage(`❌ ¡Atención! Estás fuera del área permitida (${distance.toFixed(2)} km de la escuela).`, "error");
+                } else {
+                    const record = { 
+                        docente, 
+                        type, 
+                        fecha, 
+                        diaSemana, 
+                        hora, 
+                        lat, 
+                        lon, 
+                        inZone, 
+                        clase: claseInfo,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    await saveRecord(record);
+                    showStatusMessage(`✅ Registro de ${type === 'inicio' ? 'INICIO' : 'FIN'} de jornada exitoso para ${docente}.`, "success");
+                }
+            } catch (error) {
+                let msg = "🚫 No se pudo obtener la ubicación.";
+                if (error.code === 1) msg = "🚨 Permiso de ubicación denegado. Habilita la ubicación en tu navegador.";
+                else if (error.code === 2) msg = "⚠️ La información de ubicación no está disponible.";
+                else if (error.code === 3) msg = "⌛ Tiempo de espera agotado al obtener la ubicación.";
+                showStatusMessage(msg, "error");
+            }
+        }
+
+        // -----------------------------------------------------------
+        // FUNCIÓN DE REPORTE CONSOLIDADO (ESTA SE MANTIENE)
+        // -----------------------------------------------------------
+
+        function getScheduledClasses(docente, diaSemana) {
+            if (specialRoles[docente]) {
+                const role = specialRoles[docente];
+                if (role.includes("Jornada Completa") || role.includes("Director") || role.includes("Subdirector") || role.includes("Coordinador")) {
+                    return [role];
+                }
+            }
+            const schedule = horarios[docente]?.[diaSemana];
+            return schedule ? schedule.split(' / ') : [];
+        }
+
+        function displayRecordsInTable() {
+            const tableHeader = document.querySelector("#attendance-table thead tr");
+            // 💡 Asegura que el encabezado sea el correcto para el reporte consolidado
+            tableHeader.innerHTML = `
+                <th>Docente</th>
+                <th>Fecha</th>
+                <th>Día</th>
+                <th>Registro Entrada (Hora/Clase)</th>
+                <th>Registro Salida (Hora/Clase)</th>
+                <th>Estado de Cumplimiento</th>
+            `;
+
+            db.collection("asistencia").orderBy("timestamp", "asc").get().then(snapshot => {
+                attendanceTableBody.innerHTML = '';
+                
+                // 1. Agrupar registros por Docente y Fecha
+                const groupedRecords = snapshot.docs.map(doc => doc.data()).reduce((acc, record) => {
+                    const key = `${record.docente}|${record.fecha}`;
+                    if (!acc[key]) {
+                        acc[key] = {
+                            docente: record.docente,
+                            fecha: record.fecha,
+                            diaSemana: record.diaSemana,
+                            inicios: [],
+                            fines: [],
+                            registros: []
+                        };
+                    }
+                    // Parsear el timestamp de Firebase si existe, si no usar la hora guardada
+                    let horaDisplay = record.hora;
+                    if (record.timestamp && record.timestamp.toDate) {
+                         const date = record.timestamp.toDate();
+                         horaDisplay = date.toLocaleTimeString("es-ES", {hour: '2-digit', minute:'2-digit', second: '2-digit'});
+                    }
+                    record.horaDisplay = horaDisplay;
+
+                    acc[key].registros.push(record);
+                    if (record.type === 'inicio') acc[key].inicios.push(record);
+                    if (record.type === 'fin') acc[key].fines.push(record);
+                    return acc;
+                }, {});
+
+                // Invertir para ver el más reciente primero
+                const consolidatedReports = Object.values(groupedRecords).reverse(); 
+
+                if (consolidatedReports.length === 0) {
+                    attendanceTableBody.innerHTML = `<tr><td colspan="6">No hay registros de asistencia aún.</td></tr>`;
+                    return;
+                }
+
+                consolidatedReports.forEach(report => {
+                    const scheduledClasses = getScheduledClasses(report.docente, report.diaSemana);
+                    let cumplimiento = "N/A (Sin Horario)";
+                    let colorClass = "text-muted";
+                    
+                    // 2. Determinar el estado de cumplimiento
+                    if (scheduledClasses.length > 0) {
+                        const isSpecialRole = scheduledClasses[0].includes("Jornada Completa") || scheduledClasses[0].includes("Director") || scheduledClasses[0].includes("Subdirector") || scheduledClasses[0].includes("Coordinador");
+                        
+                        if (isSpecialRole) {
+                            const tieneInicio = report.inicios.some(r => r.clase === scheduledClasses[0]);
+                            const tieneFin = report.fines.some(r => r.clase === scheduledClasses[0]);
+
+                            if (tieneInicio && tieneFin) {
+                                cumplimiento = `Jornada Completa (${scheduledClasses[0]})`;
+                                colorClass = "success";
+                            } else if (tieneInicio && !tieneFin) {
+                                cumplimiento = `Jornada Abierta (Falta fin)`;
+                                colorClass = "info";
+                            } else {
+                                cumplimiento = `Jornada No Iniciada`;
+                                colorClass = "danger";
+                            }
+                        } else {
+                            // Docentes por clase: Contar cuántas clases se registraron
+                            const scheduledClassNames = scheduledClasses.map(c => c.split('(')[0].trim());
+                            const registeredClassNames = report.inicios.map(r => r.clase.split('(')[0].trim());
+                            
+                            // Conjunto de clases programadas únicas
+                            const uniqueScheduledClasses = [...new Set(scheduledClassNames)];
+                            
+                            // Faltantes: Clases programadas que NO tienen un registro de inicio
+                            const faltantes = uniqueScheduledClasses.filter(name => !registeredClassNames.includes(name));
+                            
+                            if (faltantes.length === 0 && uniqueScheduledClasses.length > 0) {
+                                cumplimiento = "✅ Horario Completo";
+                                colorClass = "success";
+                            } else if (faltantes.length > 0 && faltantes.length < uniqueScheduledClasses.length) {
+                                cumplimiento = `⚠️ Clases incompletas: ${faltantes.join(', ')}`;
+                                colorClass = "info";
+                            }
+                            else if (faltantes.length === uniqueScheduledClasses.length) {
+                                cumplimiento = `❌ No se registró ninguna clase.`;
+                                colorClass = "danger";
+                            }
+                        }
+                    }
+
+                    // 3. Consolidar registros de Entrada y Salida para la tabla
+                    const allInicios = report.inicios
+                        .map(r => `${r.horaDisplay} (${r.clase.split('(')[0].trim()})`)
+                        .join('<br>');
+                    
+                    const allFines = report.fines
+                        .map(r => `${r.horaDisplay} (${r.clase.split('(')[0].trim()})`)
+                        .join('<br>');
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${report.docente}</td>
+                        <td>${report.fecha}</td>
+                        <td>${report.diaSemana}</td>
+                        <td>${allInicios || 'N/A'}</td>
+                        <td>${allFines || 'N/A'}</td>
+                        <td class="${colorClass}">${cumplimiento}</td>
+                    `;
+                    
+                    // Aplicar estilo de color para el cumplimiento
+                    if (colorClass === "success") {
+                        row.style.backgroundColor = "var(--color-success-bg)";
+                    } else if (colorClass === "danger") {
+                        row.style.backgroundColor = "var(--color-danger-bg)";
+                    } else if (colorClass === "info") {
+                        row.style.backgroundColor = "var(--color-info-bg)";
+                    }
+                    
+                    attendanceTableBody.appendChild(row);
+                });
+            }).catch(error => {
+                attendanceTableBody.innerHTML = `<tr><td colspan="6">Error al cargar registros: ${error.message}</td></tr>`;
+            });
+        }
+
+        // -----------------------------------------------------------
+        // LÓGICA DE INTERFAZ Y DESCARGA
+        // -----------------------------------------------------------
+
+        function handleDocenteInput() {
+            const docente = docenteInput.value.trim();
+            claseInfoDiv.style.display = "none";
+            if (docente === "") { return; }
+            const hoy = new Date();
+            const diaSemana = hoy.toLocaleDateString("es-ES", { weekday: "long" }).toLowerCase();
+            
+            if (specialRoles[docente]) {
+                const role = specialRoles[docente];
+                if (role.includes("Jornada Completa") || role.includes("Director") || role.includes("Subdirector") || role.includes("Coordinador")) {
+                    claseInfoDiv.innerHTML = `Bienvenido(a), <strong style="color: #fff;">${docente}</strong>. <br>Rol: <strong>${role}</strong>.`;
+                    claseInfoDiv.style.color = "var(--text-muted)";
+                    claseInfoDiv.style.display = "block";
+                    return; 
+                }
+            }
+
+            if (horarios[docente]) {
+                const currentClass = findCurrentClass(docente, diaSemana);
+                const teacherScheduleForToday = horarios[docente][diaSemana];
+
+                if (currentClass) {
+                    claseInfoDiv.innerHTML = `Clase actual: <br><strong style="color: #fff;">${currentClass}</strong>`;
+                    claseInfoDiv.style.color = "#8affb4";
+                } else if (teacherScheduleForToday) {
+                    const nextClass = findNextClass(docente, diaSemana);
+                    
+                    if (nextClass) {
+                        claseInfoDiv.innerHTML = `No estás en clase. <br>Tu **próxima clase** es: <strong style="color: #fff;">${nextClass}</strong>`;
+                        claseInfoDiv.style.color = "#ffdf8e";
+                    } else {
+                        claseInfoDiv.innerHTML = `Ya has completado tu horario. <br>Tu horario para hoy fue: <strong style="color: #fff;">${teacherScheduleForToday}</strong>`;
+                        claseInfoDiv.style.color = "#ffdf8e";
+                    }
+                } else {
+                    claseInfoDiv.innerHTML = `<strong style="color: #fff;">${docente}</strong>, no tienes clases programadas para hoy.`;
+                    claseInfoDiv.style.color = "#ffb4b4";
+                }
+            } else {
+                claseInfoDiv.innerHTML = `No se encontró un horario para <strong style="color: #fff;">${docente}</strong>. Puedes registrar tu asistencia.`;
+                claseInfoDiv.style.color = "var(--text-muted)";
+            }
+            claseInfoDiv.style.display = "block";
+        }
+        
+        docenteInput.addEventListener('input', handleDocenteInput);
+        
+        function toggleAdminPanel() {
+            const password = prompt("Por favor, ingresa la contraseña de administrador:");
+            if (password === ADMIN_PASSWORD) {
+                const isDisplayed = adminContainer.style.display === "block";
+                adminContainer.style.display = isDisplayed ? "none" : "block";
+                if (!isDisplayed) { displayRecordsInTable(); }
+            } else if (password) {
+                alert("Contraseña incorrecta. Acceso denegado.");
+            }
+        }
+
+        function downloadPDF() {
+            const element = document.getElementById('attendance-table');
+            const opt = { 
+                margin: 0.5, 
+                filename: 'reporte_consolidado.pdf', 
+                image: { type: 'jpeg', quality: 0.98 }, 
+                html2canvas: { scale: 2 }, 
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' } 
+            };
+            html2pdf().from(element).set(opt).save();
+        }
+
+        function downloadExcel() {
+            const table = document.getElementById("attendance-table");
+            const ws = XLSX.utils.table_to_sheet(table);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Reporte Consolidado");
+            XLSX.writeFile(wb, "reporte_consolidado.xlsx");
+        }
+
+        document.addEventListener('DOMContentLoaded', displayRecordsInTable);
+    </script>
+</body>
+</html>
