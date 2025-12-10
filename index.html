@@ -324,13 +324,23 @@
 
         const classes = teacherSchedule.split(' / ');
         
+        // Buscamos si hay alguna clase ACTIVA que tenga retardo
         return classes.find(clase => {
             const timePart = clase.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
             if (timePart) {
-                const [, startHour, startMinute] = timePart.map(Number);
+                // Capturamos hora de inicio Y hora de fin
+                const [, startHour, startMinute, endHour, endMinute] = timePart.map(Number);
+                
                 const startTimeInMinutes = startHour * 60 + startMinute;
-                if (currentTimeInMinutes > startTimeInMinutes && currentTimeInMinutes > startTimeInMinutes + MAX_DELAY_MINUTES) {
-                    return true;
+                const endTimeInMinutes = endHour * 60 + endMinute;
+
+                // CORRECCIÓN: Solo validamos retardo si la clase NO ha terminado todavía.
+                // Si la hora actual es menor a la hora de fin de la clase:
+                if (currentTimeInMinutes < endTimeInMinutes) {
+                    // Y si ya pasamos el tiempo de tolerancia...
+                    if (currentTimeInMinutes > startTimeInMinutes + MAX_DELAY_MINUTES) {
+                        return true; // Entonces sí es un retardo bloqueante
+                    }
                 }
             }
             return false;
@@ -798,4 +808,5 @@
 </script>
 </body>
 </html>
+
 
