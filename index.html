@@ -241,21 +241,95 @@
     const ADMIN_END_TIME = "15:40:00";
     const ADMIN_END_TIME_MINUTES = 15 * 60 + 40; 
 
-    const horarios = {
-        "Coral Alejandra Landa Hernández": {"jueves": "Ciencias Sociales I (09:40-10:30)","viernes": "Ciencias Sociales I (10:30-11:20)","lunes": "Ciencias Sociales I (10:30-11:20) / Ciencias de la Comunicación (08:00-08:50)","martes": "Ciencias de la Comunicación (10:30-11:20)","miércoles": "Ciencias de la Comunicación (08:00-08:50)"},
-        "Héctor Vicente Flores González": {"lunes": "Pensamiento Matemático I (10:30-11:20) / Pensamiento Matemático III (08:00-08:50) / Pensamiento Matemático I (12:50-13:40) / Cálculo Diferencial (08:50-09:40) / La Energía en los Procesos de la Vida Diaria (09:40-10:30)","martes": "Pensamiento Matemático I (12:50-13:40) / Pensamiento Matemático III (08:50-09:40) / Temas Selectos de Física (10:30-11:20) / Temas Selectos de Química (08:00-08:50)","miércoles": "Pensamiento Matemático I (13:40-14:30) / Pensamiento Matemático I (12:50-13:40) / Pensamiento Matemático III (12:00-12:50) / Cálculo Diferencial (08:00-08:50) / Temas Selectos de Química (08:50-09:40) / La Energía en los Procesos de la Vida Diaria (10:30-11:20)","jueves": "Pensamiento Matemático I (13:40-14:30) / Pensamiento Matemático III (10:30-11:20) / Pensamiento Matemático III (09:40-10:30) / Temas Selectos de Física (08:50-09:40) / Cálculo Diferencial (08:00-08:50) / La Energía en los Procesos de la Vida Diaria (12:50-13:40)","viernes": "Pensamiento Matemático I (09:40-10:30) / Pensamiento Matemático I (08:00-08:50) / Pensamiento Matemático III (12:50-13:40) / Pensamiento Matemático III (08:00-08:50) / Temas Selectos de Física (12:00-12:50) / Temas Selectos de Química (13:40-14:30) / La Energía en los Procesos de la Vida Diaria (10:30-11:20)"},
-        "Cheideny Magaly Oliveros Castrejón": {"martes": "Taller de Desarrollo Sustentable (13:40-14:30) / Taller de Desarrollo Sustentable (08:50-09:40) / Desarrollo Comunitario (CFLB) (09:40-10:30)","miércoles": "Taller de Desarrollo Sustentable (12:00-12:50) / Desarrollo Comunitario (CFLB) (09:40-11:20)","jueves": "Taller de Desarrollo Sustentable (12:50-13:40)","lunes": "Taller de Desarrollo Sustentable (13:40-14:30) / Desarrollo Comunitario (CFLB) (09:40-11:20)","viernes": "Taller de Desarrollo Sustentable (12:50-13:40) / Desarrollo Comunitario (CFLB) (09:40-11:20)"},
-        "José Idai Zamora Munguia": {"lunes": "Cultura Digital I (08:50-09:40)","martes": "Cultura Digital I (09:40-10:30)","miércoles": "Cultura Digital I (10:30-11:20)","jueves": "Cultura Digital I (12:00-12:50)","viernes": "Cultura Digital I (13:40-14:30) / Cultura Digital I (10:30-11:20)"},
-        "Brenda Sofía Hernández Amado": {"martes": "Historia del Arte (08:00-08:50)","jueves": "Historia del Arte (08:50-09:40)","viernes": "Historia del Arte (13:40-14:30)"},
-        "Diana Laura Enciso Parada": {"lunes": "Inglés (08:00-08:50) / Inglés II (13:40-14:30) / Traducción e Interpretación del Idioma Inglés (CFLB) (12:50-13:40)","martes": "Inglés II (08:00-08:50) / Traducción e Interpretación del Idioma Inglés (CFLB) (12:00-12:50)","miércoles": "Inglés (08:00-08:50) / Traducción e Interpretación del Idioma Inglés (CFLB) (12:00-13:40)","jueves": "Inglés (08:00-08:50) / Inglés II (08:50-09:40)","viernes": "Inglés (08:50-09:40) / Inglés II (08:00-08:50) / Traducción e Interpretación del Idioma Inglés (CFLB) (12:50-13:40)"},
-        "Iridian Herrera Oropeza": {"lunes": "Humanidades I (12:00-12:50) / Humanidades I (08:50-09:40) / Administración (CFLB) (09:40-11:20) / Derecho (08:00-08:50) / Conciencia Historica II Mexico Durante el Expansionismo (09:40-10:30) / Administración (CFLB) (12:50-13:40)","martes": "Humanidades I (10:30-11:20) / Administración (CFLB) (09:40-10:30) / Derecho (08:50-09:40) / Conciencia Historica II Mexico Durante el Expansionismo (09:40-10:30) / Administración (CFLB) (12:00-12:50)","miércoles": "Humanidades I (09:40-10:30) / Humanidades I (08:50-09:40) / Administración (CFLB) (09:40-11:20) / Conciencia Historica II Mexico Durante el Expansionismo (12:50-13:40) / Administración (CFLB) (12:00-13:40)","jueves": "Humanidades I (12:00-12:50) / Humanidades I (08:50-09:40) / Conciencia Historica II Mexico Durante el Expansionismo (12:50-13:40) / Conciencia Historica II Mexico Durante el Expansionismo (13:40-14:30)","viernes": "Derecho (08:00-08:50) / Conciencia Historica II Mexico Durante el Expansionismo (09:40-10:30) / Conciencia Historica II Mexico Durante el Expansionismo (09:40-10:30) / Administración (CFLB) (09:40-11:20) / Administración (CFLB) (12:50-13:40)"},
-        "Javier Arroyo Daza": {"lunes": "Inglés (08:00-08:50)","miércoles": "Inglés (08:00-08:50)","jueves": "Inglés (08:00-08:50)","viernes": "Inglés (08:50-09:40)"},
-        "Laura Verónica Adauta Rodríguez": {"lunes": "Administración (CFLB) (09:40-11:20) / Administración (08:50-09:40)","martes": "Administración (CFLB) (09:40-10:30) / Contabilidad (08:50-09:40) / Economía (08:00-08:50) / Administración (CFLB) (12:00-12:50)","miércoles": "Administración (CFLB) (09:40-11:20) / Administración (08:50-09:40) / Administración (CFLB) (12:00-13:40)","jueves": "Contabilidad (08:00-08:50) / Economía (08:50-09:40)","viernes": "Administración (CFLB) (09:40-11:20) / Contabilidad (12:00-12:50) / Administración (08:00-08:50) / Economía (13:40-14:30) / Administración (CFLB) (12:50-13:40)"},
-        "Luis Fernando Herrera Reyes": {"lunes": "Traducción e Interpretación del Idioma Inglés (CFLB) (12:50-13:40) / Inglés V (12:00-12:50) / Inglés III (13:40-14:30)","martes": "Traducción e Interpretación del Idioma Inglés (CFLB) (12:00-12:50) / Inglés V (12:50-13:40) / Inglés III (08:00-08:50)","miércoles": "Traducción e Interpretación del Idioma Inglés (CFLB) (12:00-13:40) / Inglés V (12:00-12:50)","jueves": "Inglés V (12:00-12:50) / Inglés III (08:50-09:40)","viernes": "Traducción e Interpretación del Idioma Inglés (CFLB) (12:50-13:40) / Inglés V (08:50-09:40)"},
-        "Monica Ivette Gonzalez Flores": {"lunes": "Inglés V (12:00-12:50)","martes": "Inglés V (12:50-13:40)","jueves": "Inglés V (12:00-12:50)","viernes": "Inglés V (08:50-09:40)"},
-        "Pedro Hernandez García": {"martes": "Educación Física (12:50-13:40) / Educación Física (10:30-11:20) / Educación Física (08:50-09:40)","jueves": "Educación Física (12:50-13:40)","miércoles": "Educación Física (09:40-10:30)","lunes": "Educación Física (10:30-11:20)"},
-        "Eduardo Yokanaán Tejeda Juárez": {"lunes": "Humanidades III (12:00-12:50) / Humanidades III (12:50-13:40) / logica (08:00-08:50) / Temas Selectos de Filosofía I (08:50-09:40)","martes": "Humanidades III (12:00-12:50) / Humanidades III (12:50-13:40) / logica (08:50-09:40) / Sociología (10:30-11:20)","miércoles": "Humanidades III (13:40-14:30) / Humanidades III (12:50-13:40) / Sociología (08:50-09:40) / Temas Selectos de Filosofía I (08:00-08:50)","jueves": "Humanidades III (09:40-10:30) / Humanidades III (10:30-11:20) / Sociología (08:00-08:50)","viernes": "Humanidades III (08:50-09:40) / Humanidades III (12:50-13:40) / logica (08:00-08:50) / Temas Selectos de Filosofía I (12:00-12:50)"},
-        "Milagros Ruiz Avilés": {"lunes": "Formación Socioemocional (09:40-10:30) / Psicología (08:50-09:40)","martes": "Formación Socioemocional I (08:00-08:50) / Formación Socioemocional (13:40-14:30)","miércoles": "Orientación Educativa (10:30-11:20) / Formación Socioemocional (12:00-12:50) / Orientación Educativa (08:00-08:50) / Formación Socioemocional (09:40-10:30) / Psicología (08:50-09:40)","jueves": "Formación Socioemocional (12:50-13:40) / Psicología (08:00-08:50)","viernes": "Formación Socioemocional I (08:00-08:50) / Orientación Educativa (12:50-13:40) / Orientación Educativa (12:00-12:50) / Formación Socioemocional (09:40-10:30)"},
+   const horarios = {
+        "Coral Alejandra Landa Hernández": {
+            "lunes": "Ciencias de la Comunicación (08:00-08:50) / Ciencias Sociales I (10:30-11:20)",
+            "martes": "Ciencias de la Comunicación (08:00-08:50) / Ciencias de la Comunicación (10:30-11:20)",
+            "miércoles": "Ciencias de la Comunicación (08:00-08:50)",
+            "jueves": "Ciencias Sociales I (09:40-10:30)",
+            "viernes": "Ciencias Sociales I (10:30-11:20) / Ciencias Sociales I (13:30-14:20)"
+        },
+        "José Idai Munguia Zamora": {
+            "lunes": "Cultura Digital I (08:50-09:40)",
+            "martes": "Cultura Digital I (09:40-10:30)",
+            "miércoles": "Cultura Digital I (10:30-11:20)",
+            "jueves": "Cultura Digital I (12:00-12:50)",
+            "viernes": "Cultura Digital I (10:30-11:20) / Cultura Digital I (13:30-14:20)"
+        },
+        "Pedro Hernandez García": {
+            "lunes": "Educación Física V (10:30-11:20)",
+            "martes": "Educación Física III (08:50-09:40) / Educación Física I (12:50-13:30)",
+            "miércoles": "Educación Física V (09:40-10:30)",
+            "jueves": "Educación Física I (10:30-11:20) / Educación Física III (12:50-13:30)"
+        },
+        "Milagros Ruiz Avilés": {
+            "lunes": "Psicología (08:50-09:40) / Formación Socioemocional I (09:40-10:30)",
+            "martes": "Formación Socioemocional (08:00-08:50) / Formación Socioemocional I (13:30-14:20)",
+            "miércoles": "Orientación Educativa (08:00-08:50) / Psicología (08:50-09:40) / Formación Socioemocional (12:00-12:50) / Formación Socioemocional (12:50-13:30)",
+            "jueves": "Psicología (08:00-08:50) / Orientación Educativa (10:30-11:20) / Formación Socioemocional (12:50-13:30)",
+            "viernes": "Formación Socioemocional (08:00-08:50) / Formación Socioemocional (09:40-10:30) / Orientación Educativa (12:00-12:50) / Orientación Educativa (12:50-13:30)"
+        },
+        "Iridian Herrera Oropeza": {
+            "lunes": "Derecho (08:00-08:50) / Humanidades I (08:50-09:40) / Conciencia Historica II Mexico Durante el Expansio (09:40-10:30) / Humanidades I (12:00-12:50)",
+            "martes": "Derecho (08:50-09:40) / Conciencia Historica II Mexico Durante el Expansio (09:40-10:30) / Humanidades I (10:30-11:20) / Administración (CFLB) (12:00-12:50)",
+            "miércoles": "Humanidades I (08:50-09:40) / Humanidades I (09:40-10:30) / Conciencia Historica II Mexico Durante el Expansio (12:50-13:30) / Conciencia Historica II Mexico Durante el Expansio (13:30-14:20)",
+            "jueves": "Humanidades I (08:50-09:40) / Humanidades I (12:00-12:50) / Conciencia Historica II Mexico Durante el Expansio (12:50-13:30) / Conciencia Historica II Mexico Durante el Expansio (13:30-14:20)",
+            "viernes": "Derecho (08:00-08:50) / Humanidades I (08:50-09:40) / Conciencia Historica II Mexico Durante el Expansio (09:40-10:30) / Administración (CFLB) (09:40-11:20) / Administración (CFLB) (12:50-13:30)"
+        },
+        "Javier Arroyo Daza": {
+            "lunes": "Inglés I (08:00-08:50) / Inglés I (08:50-09:40)",
+            "miércoles": "Inglés I (08:00-08:50)",
+            "jueves": "Inglés I (08:00-08:50)",
+            "viernes": "Inglés I (08:50-09:40)"
+        },
+        "Héctor Vicente Flores González": {
+            "lunes": "Pensamiento Matemático III (08:00-08:50) / Cálculo Diferencial (08:50-09:40) / La Energía en los Procesos de la Vida Diaria (09:40-10:30) / Pensamiento Matemático I (10:30-11:20) / Pensamiento Matemático III (12:00-12:50) / Pensamiento Matemático I (12:50-13:30)",
+            "martes": "Pensamiento Matemático III (08:50-09:40) / Pensamiento Matemático I (12:50-13:30) / Pensamiento Matemático I (13:30-14:20)",
+            "miércoles": "Temas Selectos de Química (08:50-09:40) / Pensamiento Matemático III (12:00-12:50) / Pensamiento Matemático I (12:50-13:30) / Pensamiento Matemático I (13:30-14:20)",
+            "jueves": "Cálculo Diferencial (08:00-08:50) / Temas Selectos de Física (08:50-09:40) / Pensamiento Matemático III (09:40-10:30) / Pensamiento Matemático III (10:30-11:20) / La Energía en los Procesos de la Vida Diaria (12:50-13:30) / Temas Selectos de Química (13:30-14:20)",
+            "viernes": "Cálculo Diferencial (08:00-08:50) / Pensamiento Matemático I (09:40-10:30) / La Energía en los Procesos de la Vida Diaria (10:30-11:20) / Temas Selectos de Física (12:00-12:50) / Pensamiento Matemático III (12:50-13:30)"
+        },
+        "Eduardo Yokanáan Tejeda Juárez": {
+            "lunes": "logica (08:00-08:50) / Temas Selectos de Filosofía I (08:50-09:40) / Humanidades III (12:00-12:50) / Humanidades III (12:50-13:30)",
+            "martes": "logica (08:50-09:40) / Sociología (10:30-11:20) / Humanidades III (12:00-12:50) / Humanidades III (12:50-13:30)",
+            "miércoles": "Temas Selectos de Filosofía I (08:00-08:50) / Sociología (08:50-09:40) / Humanidades III (12:50-13:30) / Humanidades III (13:30-14:20)",
+            "jueves": "Sociología (08:00-08:50) / Humanidades III (09:40-10:30) / Humanidades III (10:30-11:20)",
+            "viernes": "logica (08:00-08:50) / Humanidades III (08:50-09:40) / Temas Selectos de Filosofía I (12:00-12:50) / Humanidades III (12:50-13:30)"
+        },
+        "Monica Ivette Gonzalez Flores": {
+            "lunes": "INGLÉS V (12:00-12:50)",
+            "martes": "INGLÉS V (12:50-13:30)",
+            "jueves": "INGLÉS V (12:00-12:50)",
+            "viernes": "INGLÉS V (08:50-09:40) / INGLÉS V (12:00-12:50) / INGLÉS V (12:50-13:30)"
+        },
+        "Cheideny Magaly Oliveros Castrejón": {
+            "lunes": "Desarrollo Comunitario (CFLB) (09:40-10:30) / Taller de Desarrollo Sustentable (13:30-14:20)",
+            "martes": "Taller de Desarrollo Sustentable (08:50-09:40) / Desarrollo Comunitario (CFLB) (09:40-10:30) / Taller de Desarrollo Sustentable (13:30-14:20)",
+            "miércoles": "Desarrollo Comunitario (CFLB) (09:40-10:30) / Taller de Desarrollo Sustentable (12:00-12:50)",
+            "jueves": "Taller de Desarrollo Sustentable (12:50-13:30)",
+            "viernes": "Desarrollo Comunitario (CFLB) (09:40-10:30) / Taller de Desarrollo Sustentable (12:50-13:30)"
+        },
+        "Diana Laura Enciso Parada": {
+            "lunes": "Inglés I (08:00-08:50) / Inglés I (08:50-09:40) / Traducción e Interpretación del Idioma Inglés (CFLB) (13:30-14:20)",
+            "martes": "Inglés I (08:00-08:50) / Inglés I (08:50-09:40)",
+            "miércoles": "Inglés I (08:00-08:50) / Inglés I (08:50-09:40)",
+            "jueves": "Inglés I (08:00-08:50) / Inglés I (08:50-09:40) / Traducción e Interpretación del Idioma Inglés (CFLB) (13:30-14:20)",
+            "viernes": "Inglés I (08:00-08:50) / Inglés I (08:50-09:40) / Traducción e Interpretación del Idioma Inglés (CFLB) (13:30-14:20)"
+        },
+        "Laura Verónica Adauta Rodríguez": {
+            "lunes": "Administración (08:50-09:40) / Administración (CFLB) (09:40-10:30)",
+            "martes": "Economía (08:00-08:50) / Contabilidad (08:50-09:40) / Administración (CFLB) (09:40-10:30) / Administración (CFLB) (12:00-12:50)",
+            "miércoles": "Administración (08:50-09:40) / Administración (CFLB) (09:40-10:30) / Administración (CFLB) (12:00-12:50)",
+            "jueves": "Contabilidad (08:00-08:50) / Economía (08:50-09:40)",
+            "viernes": "Administración (08:00-08:50) / Economía (08:50-09:40) / Administración (CFLB) (09:40-10:30) / Contabilidad (12:00-12:50) / Administración (CFLB) (12:50-13:30)"
+        },
+        "Luis Fernando Herrera Reyes": {
+            "lunes": "Traducción e Interpretación del Idioma Inglés (CFLB) (12:50-13:30) / Inglés III (13:30-14:20)",
+            "martes": "Inglés III (08:00-08:50) / Inglés III (08:50-09:40) / INGLÉS V (12:00-12:50) / INGLÉS V (12:50-13:30) / Inglés III (13:30-14:20)",
+            "miércoles": "INGLÉS V (12:00-12:50) / Traducción e Interpretación del Idioma Inglés (CFLB) (12:50-13:30)",
+            "jueves": "Inglés III (08:00-08:50) / Inglés III (08:50-09:40) / Traducción e Interpretación del Idioma Inglés (CFLB) (12:00-12:50) / INGLÉS V (12:50-13:30)",
+            "viernes": "Inglés III (08:00-08:50) / INGLÉS V (08:50-09:40) / INGLÉS V (12:00-12:50) / Traducción e Interpretación del Idioma Inglés (CFLB) (12:50-13:30)"
+        }
     };
     const specialRoles = {"Leoncio Dionisio Castillo González": "Docente de Jornada Completa", "Abigail Portugal Álvarez": "Prefectura", "Reina Cortina Bello": "Administrativo", "María Monserrath Arroyo Pérez": "Administrativo", "Suly Morales Reyes": "Docente de Jornada Completa", "Ángel González Alejo": "Docente de Jornada Completa", "Martín Alejandro Rivadeneyra Ferrón": "Subdirector Bachillerato", "Erick David Villegas Martínez": "Coordinador Académico", "Alicia Karina Pineda Bautista": "Subdirectora Secundaría", "Yesika Cecilia Robledo Taboada": "Directora General", "Taimi Sánchez Rodríguez": "Subdirectora Preescolar", "Martha Patricia Ruiz Díaz": "Subdirectora Primaria", "Ana María Ruiz Cabrera": "Coordinadora Inglés"};
 
@@ -945,3 +1019,4 @@
 </script>
 </body>
 </html>
+
