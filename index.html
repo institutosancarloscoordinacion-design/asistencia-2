@@ -315,7 +315,6 @@
         });
     }
     
-    // --- FUNCIÓN CORREGIDA PARA VALIDACIÓN DE RETARDOS ---
     function findClassForDelayValidation(docente, diaSemana) {
         const currentHour = new Date().getHours();
         const currentMinute = new Date().getMinutes();
@@ -325,22 +324,17 @@
 
         const classes = teacherSchedule.split(' / ');
         
-        // Buscamos si hay alguna clase ACTIVA que tenga retardo
         return classes.find(clase => {
             const timePart = clase.match(/\((\d{2}):(\d{2})-(\d{2}):(\d{2})\)/);
             if (timePart) {
-                // Capturamos hora de inicio Y hora de fin
                 const [, startHour, startMinute, endHour, endMinute] = timePart.map(Number);
-                
                 const startTimeInMinutes = startHour * 60 + startMinute;
                 const endTimeInMinutes = endHour * 60 + endMinute;
 
                 // CORRECCIÓN: Solo validamos retardo si la clase NO ha terminado todavía.
-                // Si la hora actual es menor a la hora de fin de la clase:
                 if (currentTimeInMinutes < endTimeInMinutes) {
-                    // Y si ya pasamos el tiempo de tolerancia...
                     if (currentTimeInMinutes > startTimeInMinutes + MAX_DELAY_MINUTES) {
-                        return true; // Entonces sí es un retardo bloqueante
+                        return true;
                     }
                 }
             }
@@ -419,13 +413,11 @@
     // FUNCIONES PARA MONITOREO DE UBICACIÓN Y HORA
     // -----------------------------------------------------------
     
-    // --- NUEVO: Monitor para roles especiales (Administrativos) ---
     function iniciarMonitoreoHoraAdmin(docente) {
         if (adminTimeInterval) return;
 
         console.log(`🕒 Iniciando monitoreo de hora límite para: ${docente}`);
         
-        // Revisar cada 60 segundos
         adminTimeInterval = setInterval(async () => {
             const hoy = new Date();
             const currentHour = hoy.getHours();
@@ -458,7 +450,6 @@
         }, 60000); 
     }
 
-    // --- NUEVO: Monitor para fin de clase automático (Maestros) ---
     function programarCierreAutomaticoClase(docente, claseTexto) {
         if (classEndInterval) clearInterval(classEndInterval);
 
@@ -498,10 +489,9 @@
                 detenerMonitoreoUbicacion();
                 alert(`Tu clase de ${claseTexto.split('(')[0]} ha terminado. Se registró tu salida.`);
             }
-        }, 30000); // Revisa cada 30 segundos
+        }, 30000); 
     }
 
-    // --- LÓGICA DE GEOCERCA ACTUALIZADA (Salida Automática) ---
     async function handlePositionChange(position) {
         const { latitude: lat, longitude: lon } = position.coords;
         const distance = calculateDistance(SCHOOL_LAT, SCHOOL_LON, lat, lon);
@@ -509,7 +499,6 @@
 
         console.log(`Posición actualizada. Distancia: ${distance.toFixed(3)} km. En zona: ${inZone}`);
 
-        // Si estaba en zona y ahora NO lo está (y NO es rol especial)
         if (sessionState.enZona && !inZone) {
             const docente = sessionState.docente;
             
@@ -531,7 +520,7 @@
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 };
 
-                detenerMonitoreoUbicacion(); // Detenemos GPS
+                detenerMonitoreoUbicacion(); 
                 
                 await saveRecord(autoEndRecord);
                 showStatusMessage(`📍 <b>Salida Automática:</b> Se detectó que saliste del plantel.`, "warning");
@@ -573,7 +562,6 @@
         }
         sessionState = { docente: null, watchId: null, enJornada: false, enZona: true };
         
-        // También limpiamos el monitor de fin de clase si existe
         if (classEndInterval) {
             clearInterval(classEndInterval);
             classEndInterval = null;
@@ -598,14 +586,12 @@
 
         const lastRecord = lastRecordSnapshot.docs[0].data();
 
-        // Solo proceder si el último registro es un "inicio" de hoy.
         if (lastRecord.type !== "inicio" || lastRecord.fecha !== hoy.toLocaleDateString("es-ES")) {
             return null;
         }
 
         const role = specialRoles[docente];
 
-        // Lógica para roles especiales (Respaldo al login)
         if (role && (role.includes("Jornada Completa") || role.includes("Director") || role.includes("Subdirector") || role.includes("Coordinador"))) {
             if (currentTimeInMinutes > ADMIN_END_TIME_MINUTES) {
                 const autoEndRecord = {
@@ -617,7 +603,6 @@
                 return `Jornada de <b>${docente}</b> (Rol: ${role}) finalizada automáticamente por horario.`;
             }
         } 
-        // Lógica para docentes regulares (Respaldo al login)
         else if (horarios[docente]?.[diaSemana] && !role) {
             const scheduleInfo = findLastClassEndTime(docente, diaSemana);
 
@@ -651,7 +636,6 @@
             return;
         }
         
-        // Primero, verificar si la sesión actual debe cerrarse automáticamente
         const autoEndMessage = await checkAndAutoEndSessions(docente);
         if (autoEndMessage) {
             showStatusMessage(autoEndMessage, "info");
@@ -663,6 +647,30 @@
         const diaSemana = hoy.toLocaleDateString("es-ES", { weekday: "long" }).toLowerCase();
         const hora = hoy.toLocaleTimeString(); 
         let claseInfo = findCurrentClass(docente, diaSemana) || "N/A";
+        
+        // --- NUEVA LÓGICA: Si dice N/A al salir, buscar si hubo clase reciente ---
+        if (type === 'fin' && claseInfo === "N/A" && !specialRoles[docente]) {
+             const schedule = horarios[docente]?.[diaSemana];
+             if (schedule) {
+                 const classes = schedule.split(' / ');
+                 const currentMinutes = hoy.getHours() * 60 + hoy.getMinutes();
+                 
+                 // Buscamos la clase cuyo fin sea el más cercano al pasado (tolerancia 30 mins)
+                 const recentClass = classes.find(clase => {
+                    const timePart = clase.match(/-(\d{2}):(\d{2})\)/);
+                    if (timePart) {
+                        const endMins = parseInt(timePart[1]) * 60 + parseInt(timePart[2]);
+                        return currentMinutes >= endMins && currentMinutes <= endMins + 30;
+                    }
+                    return false;
+                 });
+                 
+                 if (recentClass) {
+                     claseInfo = recentClass;
+                 }
+             }
+        }
+        // -------------------------------------------------------------------------
         
         if (specialRoles[docente]) { 
             claseInfo = specialRoles[docente];
@@ -704,18 +712,15 @@
                 await saveRecord(record);
                 showStatusMessage(`✅ Registro de <b>${type === 'inicio' ? 'INICIO' : 'FIN'}</b> de jornada exitoso para <b>${docente}</b>.`, "success");
                 
-                // --- ACTIVACIÓN DE MONITORES AUTOMÁTICOS ---
                 if (type === 'inicio') {
                     if (specialRoles[docente]) {
-                        // Monitor de hora para administrativos
                         iniciarMonitoreoHoraAdmin(docente);
                     } else {
-                        // Monitor GPS y fin de clase para docentes
                         iniciarMonitoreoUbicacion(docente);
                         programarCierreAutomaticoClase(docente, claseInfo);
                     }
                 } else if (type === 'fin') {
-                    detenerMonitoreoUbicacion(); // Detiene GPS y reloj de clase
+                    detenerMonitoreoUbicacion();
                     if (adminTimeInterval) {
                         clearInterval(adminTimeInterval);
                         adminTimeInterval = null;
@@ -842,29 +847,40 @@
                             colorClass = "danger";
                         }
                     } else {
-                        // --- LÓGICA CORREGIDA PARA EL REPORTE DE HORARIO COMPLETO ---
+                        // --- LÓGICA FLEXIBLE PARA EL REPORTE ---
                         
-                        // 1. Clases que DEBERÍA dar hoy (sin duplicados)
+                        // 1. Clases programadas (sin duplicados)
                         const uniqueScheduledClasses = [...new Set(scheduledClasses.map(c => c.split('(')[0].trim()))];
                         
-                        // 2. Clases que YA INICIÓ
+                        // 2. Clases iniciadas
                         const registeredStartNames = report.inicios.map(r => r.clase.split('(')[0].trim());
                         
-                        // 3. Clases que YA TERMINÓ
+                        // 3. Clases terminadas
                         const registeredEndNames = report.fines.map(r => r.clase.split('(')[0].trim());
+
+                        // 4. Salidas Comodín (N/A, Automáticas)
+                        const salidasComodin = report.fines.filter(r => 
+                            r.clase.includes("N/A") || 
+                            r.clase.includes("Jornada finalizada") || 
+                            r.clase.includes("Salida Automática")
+                        ).length;
 
                         // Faltantes
                         const faltantesInicios = uniqueScheduledClasses.filter(name => !registeredStartNames.includes(name));
-                        const faltantesFines = uniqueScheduledClasses.filter(name => !registeredEndNames.includes(name));
+                        let faltantesFines = uniqueScheduledClasses.filter(name => !registeredEndNames.includes(name));
+                        
+                        // Si faltan salidas específicas, pero tenemos comodines, limpiamos los faltantes
+                        if (faltantesFines.length > 0 && salidasComodin >= faltantesFines.length) {
+                            faltantesFines = [];
+                        }
                         
                         if (faltantesInicios.length === 0 && uniqueScheduledClasses.length > 0) {
-                            // Si ya inició TODAS, verificamos si ya terminó TODAS
                             if (faltantesFines.length === 0) {
                                 cumplimiento = "✅ Horario Completo";
-                                colorClass = "success"; // Verde
+                                colorClass = "success"; 
                             } else {
                                 cumplimiento = "⚠️ En Curso (Faltan salidas)";
-                                colorClass = "info"; // Azul/Amarillo
+                                colorClass = "info"; 
                             }
                         } else if (faltantesInicios.length > 0 && faltantesInicios.length < uniqueScheduledClasses.length) {
                             cumplimiento = `⚠️ Clases incompletas: ${faltantesInicios.join(', ')}`;
